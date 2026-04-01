@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+.env
+
+# Flutter
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/pubspec.lock
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+server/static/uploads/*
+!server/static/uploads/.gitkeep
+
+# Node
+node_modules/
+
+# Cache
+.pip_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Deploy scripts with credentials
+scripts/ssh_cmd.py
+scripts/setup_db.py
+scripts/install_deps.py
+scripts/upload*.py
+scripts/setup_services.py
+scripts/setup_flutter*.py
+scripts/build_web.py
+scripts/run_flutter.py
+scripts/fix_*.py
+scripts/init_db.py
+scripts/test_pwa.py
+scripts/setup_nginx_pwa.py
