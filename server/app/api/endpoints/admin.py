@@ -1,6 +1,7 @@
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -30,11 +31,28 @@ MANAGED_KEYS = [
     ("TENCENT_SECRET_KEY", "腾讯云 Secret Key"),
 ]
 
+_ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
+
 
 def _mask(value: str) -> str:
     if not value or len(value) <= 8:
         return "****" if value else ""
     return value[:4] + "*" * (len(value) - 8) + value[-4:]
+
+
+def _read_env_file() -> dict[str, str]:
+    """Read .env file directly (bypasses per-worker cache)."""
+    values: dict[str, str] = {}
+    if not _ENV_PATH.exists():
+        return values
+    for line in _ENV_PATH.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            k, v = line.split("=", 1)
+            values[k.strip()] = v.strip()
+    return values
 
 
 def _create_admin_token(settings) -> str:
@@ -98,10 +116,10 @@ async def admin_login(req: AdminLoginRequest):
 
 @router.get("/api-keys", response_model=list[ApiKeyItem])
 async def get_api_keys(_=Depends(get_admin_user)):
-    settings = get_settings()
+    env_values = _read_env_file()
     result = []
     for key_name, label in MANAGED_KEYS:
-        value = getattr(settings, key_name, "")
+        value = env_values.get(key_name, "")
         result.append(ApiKeyItem(
             key=key_name,
             label=label,
@@ -114,13 +132,11 @@ async def get_api_keys(_=Depends(get_admin_user)):
 @router.put("/api-keys")
 async def update_api_keys(req: ApiKeysUpdateRequest, _=Depends(get_admin_user)):
     valid_keys = {k for k, _ in MANAGED_KEYS}
-    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".env")
 
-    if not os.path.exists(env_path):
+    if not _ENV_PATH.exists():
         raise HTTPException(status_code=500, detail=".env file not found")
 
-    with open(env_path, "r", encoding="utf-8") as f:
-        content = f.read()
+    content = _ENV_PATH.read_text(encoding="utf-8")
 
     updated = []
     for key_name, value in req.keys.items():
@@ -131,11 +147,10 @@ async def update_api_keys(req: ApiKeysUpdateRequest, _=Depends(get_admin_user)):
             content = pattern.sub(f"{key_name}={value}", content)
         else:
             content += f"\n{key_name}={value}"
+        os.environ[key_name] = value
         updated.append(key_name)
 
-    with open(env_path, "w", encoding="utf-8") as f:
-        f.write(content)
-
+    _ENV_PATH.write_text(content, encoding="utf-8")
     reload_settings()
 
     return {"updated": updated, "message": "API Key 已更新，配置已重载"}

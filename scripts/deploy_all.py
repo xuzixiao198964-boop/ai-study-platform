@@ -9,14 +9,15 @@ USER = "root"
 PASSWORD = "Xuzi-xiao198964"
 BACKEND_LOCAL = os.path.join(os.path.dirname(__file__), "..", "server")
 WEBSITE_LOCAL = os.path.join(os.path.dirname(__file__), "..", "website")
+DOC_LOCAL = os.path.join(os.path.dirname(__file__), "..", "doc")
 DEPLOY_LOCAL = os.path.join(os.path.dirname(__file__), "..", "deploy")
 BACKEND_REMOTE = "/opt/ai-study-platform"
 WEBSITE_REMOTE = "/opt/ai-study-website"
 
 
-def ssh_exec(ssh, cmd):
+def ssh_exec(ssh, cmd, timeout=120):
     print(f"[CMD] {cmd}")
-    stdin, stdout, stderr = ssh.exec_command(cmd, timeout=120)
+    stdin, stdout, stderr = ssh.exec_command(cmd, timeout=timeout)
     out = stdout.read().decode("utf-8", errors="replace")
     err = stderr.read().decode("utf-8", errors="replace")
     code = stdout.channel.recv_exit_status()
@@ -68,11 +69,21 @@ def main():
 
     # 1. Upload backend (exclude .env to preserve server config)
     print("\n=== Uploading backend ===")
-    upload_dir(sftp, BACKEND_LOCAL, BACKEND_REMOTE, exclude={"__pycache__", "venv", ".venv", "alembic"}, skip_files={".env"})
+    upload_dir(
+        sftp,
+        BACKEND_LOCAL,
+        BACKEND_REMOTE,
+        exclude={"__pycache__", "venv", ".venv", "alembic", ".pytest_cache"},
+        skip_files={".env"},
+    )
 
     # 2. Upload website
     print("\n=== Uploading official website ===")
     upload_dir(sftp, WEBSITE_LOCAL, WEBSITE_REMOTE)
+
+    # 2b. Upload project documentation (Markdown) for static access under /docs/
+    print("\n=== Uploading doc/ to website/docs ===")
+    upload_dir(sftp, DOC_LOCAL, WEBSITE_REMOTE + "/docs")
 
     # 3. Upload deploy configs
     print("\n=== Uploading deploy configs ===")
@@ -109,7 +120,25 @@ ENVEOF
 
     # 6. Install/update Python deps
     print("\n=== Installing Python dependencies ===")
-    ssh_exec(ssh, f"cd {BACKEND_REMOTE} && python3 -m venv venv 2>/dev/null; . venv/bin/activate && pip install -q -r requirements.txt")
+    ssh_exec(ssh, f"cd {BACKEND_REMOTE} && python3 -m venv venv 2>/dev/null; . venv/bin/activate && pip install -q -r requirements.txt && pip install -q pytest pytest-asyncio aiosqlite pytest-cov")
+
+    # 6b. Backend unit tests (SQLite memory, no integration)
+    print("\n=== Running backend unit tests ===")
+    code_tests = ssh_exec(
+        ssh,
+        f"cd {BACKEND_REMOTE} && . venv/bin/activate && "
+        f"export DATABASE_URL=sqlite+aiosqlite:///:memory: && "
+        f"export SECRET_KEY=deploy-test-secret-key-32chars-minimum!! && "
+        f"export ADMIN_USERNAME=admin && export ADMIN_PASSWORD=AiStudy@2026 && "
+        f"export REDIS_URL=redis://127.0.0.1:6379/15 && "
+        f"python -m pytest tests/ -v --tb=short -m 'not integration'",
+        timeout=300,
+    )
+    if code_tests != 0:
+        print("[ERROR] Unit tests failed — aborting before service restart")
+        sftp.close()
+        ssh.close()
+        sys.exit(1)
 
     # 7. Init database tables (create new tables)
     print("\n=== Initializing database ===")
