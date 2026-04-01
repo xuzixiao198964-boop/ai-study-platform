@@ -142,9 +142,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 <div class="toast" id="toast"></div>
 
 <script>
-const API_BASE = location.port === '8000' ? '' : '';
 let adminToken = sessionStorage.getItem('admin_token') || '';
 let apiKeysData = [];
+let editingKeys = {};
 
 if (adminToken) showDashboard();
 
@@ -209,6 +209,7 @@ async function loadStats() {
 async function loadApiKeys() {
   try {
     apiKeysData = await apiFetch('/api-keys');
+    editingKeys = {};
     renderKeys();
   } catch (e) {
     toast(e.message, 'error');
@@ -217,26 +218,53 @@ async function loadApiKeys() {
 
 function renderKeys() {
   const el = document.getElementById('keysList');
-  el.innerHTML = apiKeysData.map((k, i) => `
-    <div class="key-row" data-idx="${i}">
-      <div class="key-label">${k.label}</div>
-      <div class="key-value" id="kv-${i}">${k.masked_value || '<span style="color:var(--warning)">未配置</span>'}</div>
-      <div class="key-actions">
-        <button class="btn btn-sm btn-outline" onclick="toggleEdit(${i})" id="editBtn-${i}">编辑</button>
-      </div>
-    </div>
-  `).join('');
+  el.innerHTML = '';
+  apiKeysData.forEach((k, i) => {
+    const row = document.createElement('div');
+    row.className = 'key-row';
+
+    const label = document.createElement('div');
+    label.className = 'key-label';
+    label.textContent = k.label;
+
+    const kvWrap = document.createElement('div');
+    kvWrap.className = 'key-value';
+    kvWrap.id = 'kv-' + i;
+
+    const input = document.createElement('input');
+    input.className = 'edit-input';
+    input.id = 'editInput-' + i;
+    input.placeholder = '请输入 ' + k.label;
+    input.value = k.value || '';
+    input.addEventListener('input', function() { editingKeys[k.key] = this.value; });
+    kvWrap.appendChild(input);
+
+    const actions = document.createElement('div');
+    actions.className = 'key-actions';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-sm btn-primary';
+    saveBtn.textContent = '保存';
+    saveBtn.style.minWidth = '60px';
+    saveBtn.onclick = function() { saveSingleKey(k.key, input.value, saveBtn); };
+    actions.appendChild(saveBtn);
+
+    row.appendChild(label);
+    row.appendChild(kvWrap);
+    row.appendChild(actions);
+    el.appendChild(row);
+  });
 }
 
-function toggleEdit(idx) {
-  const kvEl = document.getElementById('kv-' + idx);
-  const btn = document.getElementById('editBtn-' + idx);
-  if (btn.textContent === '编辑') {
-    kvEl.innerHTML = '<input class="edit-input" id="editInput-' + idx + '" value="' + (apiKeysData[idx].value || '') + '" placeholder="请输入新的值">';
-    btn.textContent = '取消';
-  } else {
-    kvEl.innerHTML = apiKeysData[idx].masked_value || '<span style="color:var(--warning)">未配置</span>';
-    btn.textContent = '编辑';
+async function saveSingleKey(keyName, value, btn) {
+  btn.disabled = true; btn.textContent = '保存中...';
+  try {
+    await apiFetch('/api-keys', { method: 'PUT', body: JSON.stringify({ keys: { [keyName]: value } }) });
+    toast(keyName + ' 已保存', 'success');
+    await loadApiKeys();
+  } catch (e) {
+    toast('保存失败: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '保存';
   }
 }
 
@@ -244,7 +272,7 @@ async function saveAllKeys() {
   const updates = {};
   apiKeysData.forEach((k, i) => {
     const input = document.getElementById('editInput-' + i);
-    if (input && input.value !== k.value) {
+    if (input && input.value !== (k.value || '')) {
       updates[k.key] = input.value;
     }
   });
@@ -252,11 +280,11 @@ async function saveAllKeys() {
   const btn = document.getElementById('saveKeysBtn');
   btn.disabled = true; btn.textContent = '保存中...';
   try {
-    await apiFetch('/api-keys', { method: 'PUT', body: JSON.stringify({ keys: updates }) });
-    toast('API Key 已更新', 'success');
+    const res = await apiFetch('/api-keys', { method: 'PUT', body: JSON.stringify({ keys: updates }) });
+    toast('已保存 ' + (res.updated || []).length + ' 个配置项', 'success');
     await loadApiKeys();
   } catch (e) {
-    toast(e.message, 'error');
+    toast('保存失败: ' + e.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '保存全部修改';
   }
@@ -267,6 +295,8 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   event.target.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'apikeys') loadApiKeys();
+  if (name === 'overview') loadStats();
 }
 
 function toast(msg, type) {

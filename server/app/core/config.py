@@ -32,8 +32,8 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = "./static/uploads"
 
-    ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "admin123456"
+    ADMIN_USERNAME: str = "wsxzx"
+    ADMIN_PASSWORD: str = "Xuzi-xiao198964"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

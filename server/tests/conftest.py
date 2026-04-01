@@ -13,8 +13,8 @@ from sqlalchemy import text
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6379/15")
 os.environ.setdefault("SECRET_KEY", "unit-test-secret-key-at-least-32-characters!")
-os.environ.setdefault("ADMIN_USERNAME", "admin")
-os.environ.setdefault("ADMIN_PASSWORD", "admintestpass")
+os.environ.setdefault("ADMIN_USERNAME", "wsxzx")
+os.environ.setdefault("ADMIN_PASSWORD", "Xuzi-xiao198964")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "120")
 os.environ.setdefault("DEEPSEEK_API_KEY", "")
 

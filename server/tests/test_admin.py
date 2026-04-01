@@ -3,20 +3,21 @@ import os
 
 import pytest
 
-ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "admintestpass")
+ADMIN_USER = os.environ.get("ADMIN_USERNAME", "wsxzx")
+ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "Xuzi-xiao198964")
 
 
 @pytest.mark.asyncio
 async def test_admin_login_and_stats(client, unique_username):
     bad = await client.post(
         "/api/v1/admin/login",
-        json={"username": "admin", "password": "wrong"},
+        json={"username": ADMIN_USER, "password": "wrong"},
     )
     assert bad.status_code == 401
 
     ok = await client.post(
         "/api/v1/admin/login",
-        json={"username": "admin", "password": ADMIN_PASS},
+        json={"username": ADMIN_USER, "password": ADMIN_PASS},
     )
     assert ok.status_code == 200
     admin_token = ok.json()["access_token"]

@@ -25,7 +25,7 @@ async def test_remote_admin_login():
     if not INTEGRATION_BASE_URL:
         pytest.skip("INTEGRATION_BASE_URL 未设置")
 
-    user = os.getenv("INTEGRATION_ADMIN_USER", "admin")
+    user = os.getenv("INTEGRATION_ADMIN_USER", "wsxzx")
     pwd = os.getenv("INTEGRATION_ADMIN_PASSWORD", "")
     if not pwd:
         pytest.skip("INTEGRATION_ADMIN_PASSWORD 未设置")

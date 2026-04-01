@@ -109,10 +109,12 @@ ENVEOF
     ssh_exec(ssh, f"""cd {BACKEND_REMOTE} && {{
 grep -q 'ADMIN_USERNAME' .env || cat >> .env << 'ENVEOF'
 
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=AiStudy@2026
+ADMIN_USERNAME=wsxzx
+ADMIN_PASSWORD=Xuzi-xiao198964
 ENVEOF
 }}""")
+    ssh_exec(ssh, f"cd {BACKEND_REMOTE} && sed -i 's/^ADMIN_USERNAME=.*/ADMIN_USERNAME=wsxzx/' .env")
+    ssh_exec(ssh, f"cd {BACKEND_REMOTE} && sed -i 's/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=Xuzi-xiao198964/' .env")
 
     # 5. Ensure symlink
     ssh_exec(ssh, "ln -sf /etc/nginx/sites-available/ai-study /etc/nginx/sites-enabled/ai-study")
@@ -129,7 +131,7 @@ ENVEOF
         f"cd {BACKEND_REMOTE} && . venv/bin/activate && "
         f"export DATABASE_URL=sqlite+aiosqlite:///:memory: && "
         f"export SECRET_KEY=deploy-test-secret-key-32chars-minimum!! && "
-        f"export ADMIN_USERNAME=admin && export ADMIN_PASSWORD=AiStudy@2026 && "
+        f"export ADMIN_USERNAME=wsxzx && export ADMIN_PASSWORD=Xuzi-xiao198964 && "
         f"export REDIS_URL=redis://127.0.0.1:6379/15 && "
         f"python -m pytest tests/ -v --tb=short -m 'not integration'",
         timeout=300,
@@ -172,7 +174,7 @@ print('Tables created/updated successfully')
     ssh_exec(ssh, "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health | xargs -I {} echo 'App via Nginx (port 8000): HTTP {}'")
     ssh_exec(ssh, "systemctl is-active ai-study | xargs -I {} echo 'Service status: {}'")
     ssh_exec(ssh, "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:80/admin.html | xargs -I {} echo 'Admin page (port 80): HTTP {}'")
-    ssh_exec(ssh, """curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8001/api/v1/admin/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"AiStudy@2026"}' | xargs -I {} echo 'Admin API login: HTTP {}'""")
+    ssh_exec(ssh, """curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8001/api/v1/admin/login -H 'Content-Type: application/json' -d '{"username":"wsxzx","password":"Xuzi-xiao198964"}' | xargs -I {} echo 'Admin API login: HTTP {}'""")
 
     ssh.close()
     print("\n=== Deployment complete ===")
