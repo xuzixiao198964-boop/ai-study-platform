@@ -37,11 +37,15 @@ async def setup_student(
     )
     profile = result.scalar_one_or_none()
 
-    catalog = await _generate_subject_catalog(req.grade, req.region)
+    region_str = f"{req.province} {req.city} {req.district}".strip()
+    catalog = await _generate_subject_catalog(req.grade, region_str)
 
     if profile:
         profile.grade = req.grade
-        profile.region = req.region
+        profile.province = req.province
+        profile.city = req.city
+        profile.district = req.district
+        profile.region = region_str
         profile.ai_name = req.ai_name
         profile.ai_voice = req.ai_voice
         profile.ai_speed = req.ai_speed
@@ -50,7 +54,10 @@ async def setup_student(
         profile = StudentProfile(
             user_id=user.id,
             grade=req.grade,
-            region=req.region,
+            province=req.province,
+            city=req.city,
+            district=req.district,
+            region=region_str,
             ai_name=req.ai_name,
             ai_voice=req.ai_voice,
             ai_speed=req.ai_speed,
