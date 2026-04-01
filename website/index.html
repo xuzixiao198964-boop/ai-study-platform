@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习指认AI — K12智能学习辅导平台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #4F6AF6;
+            --primary-dark: #3D56D4;
+            --accent: #FF6B6B;
+            --bg: #F7F8FC;
+            --card: #FFFFFF;
+            --text: #1A1D2E;
+            --text-secondary: #6B7280;
+            --border: #E5E7EB;
+            --gradient: linear-gradient(135deg, #4F6AF6 0%, #6C5CE7 100%);
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; color: var(--text); line-height: 1.6; background: var(--bg); }
+        a { text-decoration: none; color: inherit; }
+
+        /* Nav */
+        .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+        .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-logo { font-size: 20px; font-weight: 700; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-links { display: flex; gap: 32px; }
+        .nav-links a { color: var(--text-secondary); font-size: 15px; transition: color .2s; }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Hero */
+        .hero { padding: 140px 24px 80px; text-align: center; background: linear-gradient(180deg, #EEF0FF 0%, var(--bg) 100%); }
+        .hero h1 { font-size: 48px; font-weight: 800; margin-bottom: 20px; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero p { font-size: 20px; color: var(--text-secondary); max-width: 640px; margin: 0 auto 40px; }
+        .hero-buttons { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 32px; border-radius: 12px; font-size: 16px; font-weight: 600; transition: all .2s; cursor: pointer; border: none; }
+        .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 4px 15px rgba(79,106,246,0.4); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79,106,246,0.5); }
+        .btn-outline { background: var(--card); color: var(--primary); border: 2px solid var(--primary); }
+        .btn-outline:hover { background: var(--primary); color: #fff; }
+
+        /* Section */
+        .section { max-width: 1200px; margin: 0 auto; padding: 80px 24px; }
+        .section-title { text-align: center; font-size: 36px; font-weight: 700; margin-bottom: 16px; }
+        .section-subtitle { text-align: center; font-size: 18px; color: var(--text-secondary); margin-bottom: 56px; }
+
+        /* Features */
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+        .feature-card { background: var(--card); border-radius: 16px; padding: 32px; border: 1px solid var(--border); transition: all .3s; }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.08); }
+        .feature-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 20px; }
+        .feature-card h3 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+        .feature-card p { color: var(--text-secondary); font-size: 15px; }
+
+        /* Download */
+        .download-section { background: linear-gradient(135deg, #4F6AF6 0%, #6C5CE7 50%, #A855F7 100%); border-radius: 24px; padding: 64px 40px; text-align: center; color: #fff; }
+        .download-section h2 { font-size: 36px; margin-bottom: 16px; }
+        .download-section p { font-size: 18px; opacity: 0.9; margin-bottom: 40px; }
+        .download-cards { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+        .download-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); border-radius: 16px; padding: 32px; width: 280px; transition: all .3s; }
+        .download-card:hover { background: rgba(255,255,255,0.25); transform: translateY(-4px); }
+        .download-card .icon { font-size: 48px; margin-bottom: 16px; }
+        .download-card h3 { font-size: 20px; margin-bottom: 8px; }
+        .download-card p { font-size: 14px; opacity: 0.8; margin-bottom: 20px; }
+        .download-btn { display: inline-block; padding: 10px 24px; background: #fff; color: var(--primary); border-radius: 8px; font-weight: 600; font-size: 14px; transition: all .2s; }
+        .download-btn:hover { transform: scale(1.05); }
+        .download-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* PWA Guide */
+        .guide-steps { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+        .guide-step { background: var(--card); border-radius: 16px; padding: 28px; border: 1px solid var(--border); width: 260px; text-align: center; }
+        .guide-step .step-num { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+        .guide-step h4 { font-size: 16px; margin-bottom: 8px; }
+        .guide-step p { font-size: 14px; color: var(--text-secondary); }
+
+        /* Footer */
+        .footer { border-top: 1px solid var(--border); padding: 40px 24px; text-align: center; color: var(--text-secondary); font-size: 14px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 32px; }
+            .hero p { font-size: 16px; }
+            .section-title { font-size: 28px; }
+            .features-grid { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+            .download-section { padding: 40px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <div class="nav-logo">🎓 学习指认AI</div>
+        <div class="nav-links">
+            <a href="#features">核心功能</a>
+            <a href="#download">下载客户端</a>
+            <a href="#guide">使用指南</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <h1>学习指认AI</h1>
+    <p>K12智能学习辅导平台 — 语音对话驱动，AI实时陪伴，家长远程协同，让学习更高效</p>
+    <div class="hero-buttons">
+        <a href="#download" class="btn btn-primary">📱 下载客户端</a>
+        <a href="#features" class="btn btn-outline">了解更多</a>
+    </div>
+</section>
+
+<!-- Features -->
+<section class="section" id="features">
+    <h2 class="section-title">核心功能</h2>
+    <p class="section-subtitle">以语音对话为核心，AI全程陪伴学生学习</p>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon" style="background:#EEF0FF;">🎙️</div>
+            <h3>语音实时对话</h3>
+            <p>登录即开始与AI语音聊天，无需打字，像和老师面对面交流一样自然。AI根据停顿智能判断是否需要回答。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:#FEF3C7;">📸</div>
+            <h3>智能场景切换</h3>
+            <p>说"我要做作业"，AI自动打开摄像头。对焦完成后左右分屏：左边实时画面，右边OCR识别结果。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:#DBEAFE;">👆</div>
+            <h3>手指指认交互</h3>
+            <p>指着书本上的题目说"这道题怎么做"，AI自动识别你指的题目，确认后开始讲解。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:#D1FAE5;">✅</div>
+            <h3>AI批改与讲解</h3>
+            <p>通过语音和指认完成批改，无需按钮操作。AI讲解通俗易懂，贴合学生认知水平。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:#FEE2E2;">👨‍👩‍👧</div>
+            <h3>家长远程介入</h3>
+            <p>家长可随时远程接入，画中画视频交互。家长介入后AI自动转为辅助角色，支持三方交流。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:#F3E8FF;">📊</div>
+            <h3>智能错题管理</h3>
+            <p>错题按科目/章节自动归类，家长可创建错题集，AI自审核生成针对性练习题，支持正确题与错误题比例配置。</p>
+        </div>
+    </div>
+</section>
+
+<!-- Download -->
+<section class="section" id="download">
+    <div class="download-section">
+        <h2>下载客户端</h2>
+        <p>支持 iPad、Android 手机/平板，随时随地开始学习</p>
+        <div class="download-cards">
+            <div class="download-card">
+                <div class="icon">🍎</div>
+                <h3>iOS / iPadOS</h3>
+                <p>支持 iPad，通过 USB 摄像头实现试题指认</p>
+                <span class="download-btn disabled">即将上架 App Store</span>
+            </div>
+            <div class="download-card">
+                <div class="icon">🤖</div>
+                <h3>Android</h3>
+                <p>支持 Android 手机和平板，家长端首选</p>
+                <span class="download-btn disabled">即将发布 APK</span>
+            </div>
+            <div class="download-card">
+                <div class="icon">🌐</div>
+                <h3>网页版 (PWA)</h3>
+                <p>无需安装，Safari 浏览器直接访问使用</p>
+                <a href="http://101.201.244.150:8000" class="download-btn" target="_blank">立即访问</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PWA Guide -->
+<section class="section" id="guide">
+    <h2 class="section-title">iPad PWA 安装指南</h2>
+    <p class="section-subtitle">无需 App Store，将网页版添加到主屏幕即可获得类原生体验</p>
+    <div class="guide-steps">
+        <div class="guide-step">
+            <div class="step-num">1</div>
+            <h4>打开 Safari</h4>
+            <p>在 iPad 上使用 Safari 浏览器访问<br><strong>http://101.201.244.150:8000</strong></p>
+        </div>
+        <div class="guide-step">
+            <div class="step-num">2</div>
+            <h4>点击分享按钮</h4>
+            <p>点击 Safari 底部工具栏中间的 <strong>分享</strong> 图标（方框+箭头）</p>
+        </div>
+        <div class="guide-step">
+            <div class="step-num">3</div>
+            <h4>添加到主屏幕</h4>
+            <p>在弹出菜单中选择 <strong>"添加到主屏幕"</strong></p>
+        </div>
+        <div class="guide-step">
+            <div class="step-num">4</div>
+            <h4>开始使用</h4>
+            <p>主屏幕出现应用图标，点击即可全屏使用</p>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>© 2026 学习指认AI — K12智能学习辅导平台</p>
+</footer>
+
+</body>
+</html>

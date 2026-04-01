@@ -8,13 +8,22 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = "change-me"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 2880  # 48 hours
 
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
 
     AGORA_APP_ID: str = ""
     AGORA_APP_CERTIFICATE: str = ""
+
+    # 火山引擎 STT
+    VOLCANO_APP_ID: str = ""
+    VOLCANO_ACCESS_KEY: str = ""
+    VOLCANO_SECRET_KEY: str = ""
+
+    # 腾讯云 TTS
+    TENCENT_SECRET_ID: str = ""
+    TENCENT_SECRET_KEY: str = ""
 
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"
@@ -23,9 +32,17 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = "./static/uploads"
 
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin123456"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def reload_settings():
+    """Clear cached settings so next call re-reads .env"""
+    get_settings.cache_clear()

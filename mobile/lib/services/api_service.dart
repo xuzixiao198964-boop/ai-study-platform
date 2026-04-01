@@ -188,4 +188,52 @@ class ApiService {
     });
     return resp.data;
   }
+
+  // === 对话 ===
+  Future<Map<String, dynamic>> sendChatMessage(String sessionId, String content, {String scene = 'chat'}) async {
+    final resp = await _dio.post('/chat/message', data: {
+      'session_id': sessionId,
+      'content': content,
+      'scene': scene,
+    });
+    return resp.data;
+  }
+
+  Future<List<dynamic>> getChatHistory(String sessionId, {int limit = 50}) async {
+    final resp = await _dio.get('/chat/history/$sessionId', queryParameters: {'limit': limit});
+    return resp.data;
+  }
+
+  // === 初始化 ===
+  Future<Map<String, dynamic>> setupStudent({
+    required int grade,
+    required String region,
+    String aiName = '小智',
+    String aiVoice = 'gentle_female',
+    String aiSpeed = 'medium',
+  }) async {
+    final resp = await _dio.post('/init/setup', data: {
+      'grade': grade,
+      'region': region,
+      'ai_name': aiName,
+      'ai_voice': aiVoice,
+      'ai_speed': aiSpeed,
+    });
+    return resp.data;
+  }
+
+  Future<Map<String, dynamic>?> getProfile() async {
+    final resp = await _dio.get('/init/profile');
+    if (resp.statusCode == 200 && resp.data != null) return resp.data;
+    return null;
+  }
+
+  Future<Map<String, dynamic>> updateAIConfig({String? aiName, String? aiVoice, String? aiSpeed}) async {
+    final resp = await _dio.put('/init/ai-config', data: {
+      if (aiName != null) 'ai_name': aiName,
+      if (aiVoice != null) 'ai_voice': aiVoice,
+      if (aiSpeed != null) 'ai_speed': aiSpeed,
+    });
+    return resp.data;
+  }
 }
