@@ -3,9 +3,10 @@ from pydantic import BaseModel
 
 class InitSetupRequest(BaseModel):
     grade: int
-    province: str
-    city: str
-    district: str
+    province: str = ""
+    city: str = ""
+    district: str = ""
+    region: str = ""
     ai_name: str = "小智"
     ai_voice: str = "gentle_female"
     ai_speed: str = "medium"
@@ -19,10 +20,10 @@ class AIConfigUpdateRequest(BaseModel):
 
 class StudentProfileResponse(BaseModel):
     grade: int
-    province: str
-    city: str
-    district: str
-    region: str
+    province: str = ""
+    city: str = ""
+    district: str = ""
+    region: str = ""
     ai_name: str
     ai_voice: str
     ai_speed: str
