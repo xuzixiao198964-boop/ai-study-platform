@@ -204,17 +204,37 @@ class ApiService {
     return resp.data;
   }
 
+  // === 省市区 ===
+  Future<List<String>> getProvinces() async {
+    final resp = await _dio.get('/regions/provinces');
+    return List<String>.from(resp.data);
+  }
+
+  Future<List<String>> getCities(String province) async {
+    final resp = await _dio.get('/regions/cities', queryParameters: {'province': province});
+    return List<String>.from(resp.data);
+  }
+
+  Future<List<String>> getDistricts(String province, String city) async {
+    final resp = await _dio.get('/regions/districts', queryParameters: {'province': province, 'city': city});
+    return List<String>.from(resp.data);
+  }
+
   // === 初始化 ===
   Future<Map<String, dynamic>> setupStudent({
     required int grade,
-    required String region,
+    required String province,
+    required String city,
+    required String district,
     String aiName = '小智',
     String aiVoice = 'gentle_female',
     String aiSpeed = 'medium',
   }) async {
     final resp = await _dio.post('/init/setup', data: {
       'grade': grade,
-      'region': region,
+      'province': province,
+      'city': city,
+      'district': district,
       'ai_name': aiName,
       'ai_voice': aiVoice,
       'ai_speed': aiSpeed,

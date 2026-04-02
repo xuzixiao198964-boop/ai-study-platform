@@ -206,9 +206,59 @@ class _InitSetupView extends StatefulWidget {
 
 class _InitSetupViewState extends State<_InitSetupView> {
   final _nameCtrl = TextEditingController(text: '小智');
-  final _regionCtrl = TextEditingController();
   int _grade = 3;
   bool _loading = false;
+
+  List<String> _provinces = [];
+  List<String> _cities = [];
+  List<String> _districts = [];
+  String? _selectedProvince;
+  String? _selectedCity;
+  String? _selectedDistrict;
+  bool _loadingRegions = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProvinces();
+  }
+
+  Future<void> _loadProvinces() async {
+    try {
+      final list = await ApiService().getProvinces();
+      if (mounted) setState(() { _provinces = list; _loadingRegions = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingRegions = false);
+    }
+  }
+
+  Future<void> _onProvinceChanged(String? value) async {
+    setState(() {
+      _selectedProvince = value;
+      _selectedCity = null;
+      _selectedDistrict = null;
+      _cities = [];
+      _districts = [];
+    });
+    if (value == null) return;
+    try {
+      final list = await ApiService().getCities(value);
+      if (mounted) setState(() => _cities = list);
+    } catch (_) {}
+  }
+
+  Future<void> _onCityChanged(String? value) async {
+    setState(() {
+      _selectedCity = value;
+      _selectedDistrict = null;
+      _districts = [];
+    });
+    if (value == null || _selectedProvince == null) return;
+    try {
+      final list = await ApiService().getDistricts(_selectedProvince!, value);
+      if (mounted) setState(() => _districts = list);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -251,13 +301,45 @@ class _InitSetupViewState extends State<_InitSetupView> {
           const SizedBox(height: 24),
           const Text('就读区域', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          TextField(
-            controller: _regionCtrl,
-            decoration: const InputDecoration(
-              hintText: '例如：北京市海淀区',
-              border: OutlineInputBorder(),
+          if (_loadingRegions)
+            const Center(child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircularProgressIndicator(),
+            ))
+          else ...[
+            DropdownButtonFormField<String>(
+              value: _selectedProvince,
+              decoration: const InputDecoration(
+                labelText: '省/自治区/直辖市',
+                border: OutlineInputBorder(),
+              ),
+              isExpanded: true,
+              items: _provinces.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+              onChanged: _onProvinceChanged,
             ),
-          ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedCity,
+              decoration: const InputDecoration(
+                labelText: '市/州',
+                border: OutlineInputBorder(),
+              ),
+              isExpanded: true,
+              items: _cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              onChanged: _onCityChanged,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedDistrict,
+              decoration: const InputDecoration(
+                labelText: '区/县',
+                border: OutlineInputBorder(),
+              ),
+              isExpanded: true,
+              items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              onChanged: (value) => setState(() => _selectedDistrict = value),
+            ),
+          ],
           const SizedBox(height: 24),
           const Text('给AI起个名字', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
@@ -282,15 +364,17 @@ class _InitSetupViewState extends State<_InitSetupView> {
   }
 
   Future<void> _submit() async {
-    if (_regionCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请填写就读区域')));
+    if (_selectedProvince == null || _selectedCity == null || _selectedDistrict == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请选择完整的就读区域（省/市/区）')));
       return;
     }
     setState(() => _loading = true);
     try {
       await ApiService().setupStudent(
         grade: _grade,
-        region: _regionCtrl.text.trim(),
+        province: _selectedProvince!,
+        city: _selectedCity!,
+        district: _selectedDistrict!,
         aiName: _nameCtrl.text.trim().isEmpty ? '小智' : _nameCtrl.text.trim(),
       );
       widget.onComplete();
@@ -306,7 +390,6 @@ class _InitSetupViewState extends State<_InitSetupView> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _regionCtrl.dispose();
     super.dispose();
   }
 }
