@@ -6,6 +6,8 @@ import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/speech_service.dart';
+import '../../services/tts_service.dart';
 
 class StudentHomeScreen extends StatefulWidget {
   const StudentHomeScreen({super.key});
@@ -36,8 +38,20 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           _aiName = profile['ai_name'] ?? '小智';
           _hasProfile = true;
         });
+      } else if (mounted) {
+        // 如果没有profile，设置为false显示设置页面
+        setState(() {
+          _hasProfile = false;
+        });
       }
-    } catch (_) {}
+    } catch (_) {
+      // 出错时也显示设置页面
+      if (mounted) {
+        setState(() {
+          _hasProfile = false;
+        });
+      }
+    }
   }
 
   void _switchScene(String newScene) {
@@ -294,7 +308,7 @@ class _InitSetupViewState extends State<_InitSetupView> {
                 label: Text(label),
                 selected: _grade == g,
                 onSelected: (_) => setState(() => _grade = g),
-                selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+                selectedColor: AppTheme.primaryColor.withOpacity(0.2),
               );
             }),
           ),
@@ -418,20 +432,140 @@ class _ChatViewState extends State<_ChatView> {
   final TextEditingController _inputCtrl = TextEditingController();
   bool _isSending = false;
   bool _isListening = false;
+  bool _voiceMode = false;
+  String _speechText = '';
+  int _silenceMs = 0;
+  late final SpeechService _speech;
+  late final TtsService _tts;
 
   @override
   void initState() {
     super.initState();
+    _speech = SpeechService();
+    _speech.silenceTimeoutMs = 1000;
+    _speech.onUpdate = _onSpeechUpdate;
+    _speech.onAutoSend = _onSpeechAutoSend;
+    _speech.onError = _onSpeechError;
+
+    _tts = TtsService();
+
     _messages.add(_ChatMsg(
       role: 'assistant',
-      content: '你好！我是${widget.aiName}，你的学习小助手。有什么想聊的，或者说"我要做作业"我帮你打开摄像头～',
+      content: '你好！我是${widget.aiName}，你的学习小助手。点击麦克风开始语音对话，或者说"我要做作业"我帮你打开摄像头～',
     ));
+
+    // 延迟自动开启语音模式并播放欢迎语音
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted && !_isListening) {
+        // 先开启语音识别
+        _autoStartListening();
+        // 延迟后播放欢迎语音
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && _tts.isSupported) {
+            _tts.speak('你好！我是${widget.aiName}，你的学习小助手。');
+          }
+        });
+      }
+    });
+  }
+
+  void _autoStartListening() {
+    final info = _speech.getInfo();
+    if (!info.supported) return;
+
+    setState(() {
+      _isListening = true;
+      _speechText = '';
+      _silenceMs = 0;
+    });
+    _speech.start(lang: 'zh-CN');
+  }
+
+  void _onSpeechUpdate(String text, int silenceMs) {
+    if (!mounted) return;
+    setState(() {
+      _speechText = text;
+      _silenceMs = silenceMs;
+    });
+  }
+
+  void _onSpeechAutoSend(String text) {
+    if (!mounted) return;
+    // 重置状态，保持语音识别继续运行
+    setState(() {
+      _speechText = '';
+      _silenceMs = 0;
+    });
+    if (text.trim().isNotEmpty) {
+      _voiceMode = true;
+      _sendMessage(text);
+    }
+  }
+
+  void _onSpeechError(String error) {
+    if (!mounted) return;
+    setState(() {
+      _isListening = false;
+      _speechText = '';
+      _silenceMs = 0;
+    });
+    String msg;
+    if (error == 'NOT_SUPPORTED') {
+      msg = _speech.getInfo().unsupportedReason;
+    } else if (error == 'not-allowed') {
+      msg = '请允许麦克风权限后重试';
+    } else {
+      msg = '语音识别出错: $error';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 4)));
+  }
+
+  void _toggleListening() {
+    _tts.stop();
+    if (_isListening) {
+      // Manual stop: grab text and send
+      final text = _speech.getText();
+      _speech.stop();
+      setState(() {
+        _isListening = false;
+        _speechText = '';
+        _silenceMs = 0;
+      });
+      if (text.trim().isNotEmpty) {
+        _voiceMode = true;
+        _sendMessage(text);
+      }
+    } else {
+      final info = _speech.getInfo();
+      if (!info.supported) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(info.unsupportedReason), duration: const Duration(seconds: 5)),
+        );
+        return;
+      }
+      setState(() {
+        _isListening = true;
+        _speechText = '';
+        _silenceMs = 0;
+      });
+      _speech.start(lang: 'zh-CN');
+    }
   }
 
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty || _isSending) return;
     final content = text.trim();
+    final wasVoice = _voiceMode;
     _inputCtrl.clear();
+
+    // 语音模式下不关闭语音识别
+    // if (_isListening) {
+    //   _speech.stop();
+    //   setState(() {
+    //     _isListening = false;
+    //     _speechText = '';
+    //   });
+    // }
 
     setState(() {
       _messages.add(_ChatMsg(role: 'user', content: content));
@@ -442,10 +576,16 @@ class _ChatViewState extends State<_ChatView> {
     try {
       final result = await ApiService().sendChatMessage(widget.sessionId, content, scene: 'chat');
       if (mounted) {
+        final reply = result['reply'] ?? '';
         setState(() {
-          _messages.add(_ChatMsg(role: 'assistant', content: result['reply'] ?? ''));
+          _messages.add(_ChatMsg(role: 'assistant', content: reply));
         });
         _scrollToBottom();
+
+        // 语音模式下自动播放AI回复，但不关闭语音识别
+        if (wasVoice && reply.isNotEmpty && _tts.isSupported) {
+          _tts.speak(reply);
+        }
 
         if (result['scene_changed'] == true && result['new_scene'] == 'camera') {
           await Future.delayed(const Duration(milliseconds: 800));
@@ -460,6 +600,8 @@ class _ChatViewState extends State<_ChatView> {
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
+      // 保持语音模式
+      // _voiceMode = false;
     }
   }
 
@@ -475,10 +617,80 @@ class _ChatViewState extends State<_ChatView> {
     });
   }
 
+  String get _listeningStatus {
+    if (_speechText.isEmpty) return '正在听你说话...（1秒停顿后自动发送）';
+    if (_silenceMs > 0) {
+      final remain = ((_speech.silenceTimeoutMs - _silenceMs) / 1000).clamp(0.0, 9.9).toStringAsFixed(1);
+      return '${remain}秒后自动发送';
+    }
+    return '识别中...';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Voice recognition banner (separate from input field)
+        if (_isListening)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.06),
+              border: Border(bottom: BorderSide(color: AppTheme.primaryColor.withOpacity(0.15))),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _speechText.isEmpty ? Icons.mic : Icons.graphic_eq,
+                      color: _silenceMs > 0 ? Colors.orange : AppTheme.errorColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _listeningStatus,
+                        style: TextStyle(
+                          color: _silenceMs > 0 ? Colors.orange : AppTheme.textSecondary,
+                          fontSize: 12,
+                          fontWeight: _silenceMs > 0 ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    if (_speechText.isNotEmpty)
+                      TextButton(
+                        onPressed: _toggleListening,
+                        child: const Text('立即发送', style: TextStyle(fontWeight: FontWeight.bold)),
+                      )
+                    else
+                      TextButton(
+                        onPressed: () {
+                          _speech.stop();
+                          setState(() {
+                            _isListening = false;
+                            _speechText = '';
+                          });
+                        },
+                        child: const Text('取消'),
+                      ),
+                  ],
+                ),
+                if (_speechText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, left: 28, right: 8),
+                    child: Text(
+                      _speechText,
+                      style: const TextStyle(fontSize: 16, color: AppTheme.textPrimary, height: 1.4),
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             controller: _scrollCtrl,
@@ -524,7 +736,7 @@ class _ChatViewState extends State<_ChatView> {
                   bottomLeft: Radius.circular(isUser ? 16 : 4),
                   bottomRight: Radius.circular(isUser ? 4 : 16),
                 ),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
               ),
               child: Text(
                 msg.content,
@@ -592,7 +804,7 @@ class _ChatViewState extends State<_ChatView> {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.6),
+            color: AppTheme.primaryColor.withOpacity(0.6),
             shape: BoxShape.circle,
           ),
         ),
@@ -610,28 +822,24 @@ class _ChatViewState extends State<_ChatView> {
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, -2))],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, -2))],
       ),
       child: Row(
         children: [
           IconButton(
             icon: Icon(
-              _isListening ? Icons.mic : Icons.mic_none,
+              _isListening ? Icons.stop_circle : Icons.mic_none,
               color: _isListening ? AppTheme.errorColor : AppTheme.primaryColor,
               size: 28,
             ),
-            onPressed: () {
-              setState(() => _isListening = !_isListening);
-              if (!_isListening && _inputCtrl.text.isNotEmpty) {
-                _sendMessage(_inputCtrl.text);
-              }
-            },
+            onPressed: _toggleListening,
+            tooltip: _isListening ? '停止语音' : '语音输入',
           ),
           Expanded(
             child: TextField(
               controller: _inputCtrl,
               decoration: InputDecoration(
-                hintText: '输入消息或点击麦克风语音输入...',
+                hintText: '语音对话中...或输入文字消息',
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
@@ -641,15 +849,28 @@ class _ChatViewState extends State<_ChatView> {
                 filled: true,
                 fillColor: Colors.grey[50],
               ),
-              onSubmitted: _sendMessage,
+              onSubmitted: (t) {
+                _voiceMode = false;
+                _sendMessage(t);
+              },
               textInputAction: TextInputAction.send,
             ),
           ),
           const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.send_rounded, color: AppTheme.primaryColor),
-            onPressed: () => _sendMessage(_inputCtrl.text),
-          ),
+          if (_tts.isSpeaking)
+            IconButton(
+              icon: const Icon(Icons.stop, color: AppTheme.errorColor),
+              tooltip: '停止朗读',
+              onPressed: () => setState(() => _tts.stop()),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.send_rounded, color: AppTheme.primaryColor),
+              onPressed: () {
+                _voiceMode = false;
+                _sendMessage(_inputCtrl.text);
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.camera_alt_outlined, color: AppTheme.primaryColor),
             tooltip: '打开摄像头',
@@ -662,6 +883,8 @@ class _ChatViewState extends State<_ChatView> {
 
   @override
   void dispose() {
+    _speech.dispose();
+    _tts.dispose();
     _scrollCtrl.dispose();
     _inputCtrl.dispose();
     super.dispose();
@@ -745,7 +968,7 @@ class _CameraViewState extends State<_CameraView> {
         // 状态栏
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          color: AppTheme.primaryColor.withValues(alpha: 0.1),
+          color: AppTheme.primaryColor.withOpacity(0.1),
           child: Row(
             children: [
               Icon(
@@ -942,7 +1165,7 @@ class _CameraViewState extends State<_CameraView> {
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, -2))],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, -2))],
       ),
       child: Row(
         children: [

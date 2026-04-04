@@ -23,7 +23,7 @@ class OnlineStatusIndicator extends StatelessWidget {
             color: isOnline ? AppTheme.correctColor : Colors.grey,
             shape: BoxShape.circle,
             boxShadow: isOnline
-                ? [BoxShadow(color: AppTheme.correctColor.withValues(alpha: 0.4), blurRadius: 6)]
+                ? [BoxShadow(color: AppTheme.correctColor.withOpacity(0.4), blurRadius: 6)]
                 : null,
           ),
         ),
@@ -61,9 +61,9 @@ class PermissionBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.warningColor.withValues(alpha: 0.1),
+        color: AppTheme.warningColor.withOpacity(0.1),
         border: Border(
-          bottom: BorderSide(color: AppTheme.warningColor.withValues(alpha: 0.3)),
+          bottom: BorderSide(color: AppTheme.warningColor.withOpacity(0.3)),
         ),
       ),
       child: Row(
@@ -123,7 +123,7 @@ class ApprovalStatusChip extends StatelessWidget {
     return Chip(
       avatar: Icon(icon, size: 16, color: color),
       label: Text(text, style: TextStyle(color: color, fontSize: 12)),
-      backgroundColor: color.withValues(alpha: 0.1),
+      backgroundColor: color.withOpacity(0.1),
       side: BorderSide.none,
       padding: EdgeInsets.zero,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

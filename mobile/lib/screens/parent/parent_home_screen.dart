@@ -398,7 +398,7 @@ class _PermissionTab extends StatelessWidget {
 
           const SizedBox(height: 24),
           Card(
-            color: AppTheme.warningColor.withValues(alpha: 0.1),
+            color: AppTheme.warningColor.withOpacity(0.1),
             child: const Padding(
               padding: EdgeInsets.all(16),
               child: Row(

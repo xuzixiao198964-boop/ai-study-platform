@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API开发者中心 - 学习指认AI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #4F6AF6;
+            --primary-dark: #3D56D4;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --bg: #F7F8FC;
+            --card: #FFFFFF;
+            --text: #1A1D2E;
+            --text-secondary: #6B7280;
+            --border: #E5E7EB;
+            --gradient: linear-gradient(135deg, #4F6AF6 0%, #6C5CE7 100%);
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; color: var(--text); line-height: 1.6; background: var(--bg); }
+
+        /* Nav */
+        .nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 16px 24px; }
+        .nav-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .nav-logo { font-size: 18px; font-weight: 700; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-back { color: var(--text-secondary); font-size: 14px; }
+        .nav-back:hover { color: var(--primary); }
+
+        /* Container */
+        .container { max-width: 1000px; margin: 40px auto; padding: 0 24px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 8px; margin-bottom: 32px; background: var(--card); padding: 8px; border-radius: 12px; border: 1px solid var(--border); }
+        .tab { flex: 1; padding: 12px; text-align: center; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all .2s; }
+        .tab:hover { background: var(--bg); }
+        .tab.active { background: var(--gradient); color: #fff; }
+
+        /* Card */
+        .card { background: var(--card); border-radius: 16px; padding: 32px; border: 1px solid var(--border); margin-bottom: 24px; }
+        .card-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .card-subtitle { color: var(--text-secondary); margin-bottom: 24px; }
+
+        /* Form */
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+        .form-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; transition: all .2s; }
+        .form-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,106,246,0.1); }
+        .form-hint { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
+
+        /* Button */
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all .2s; }
+        .btn-primary { background: var(--gradient); color: #fff; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79,106,246,0.4); }
+        .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-outline:hover { background: var(--primary); color: #fff; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-success { background: var(--success); color: #fff; }
+
+        /* Alert */
+        .alert { padding: 16px; border-radius: 8px; margin-bottom: 20px; display: none; }
+        .alert.show { display: block; }
+        .alert-success { background: #D1FAE5; color: #065F46; border: 1px solid #10B981; }
+        .alert-error { background: #FEE2E2; color: #991B1B; border: 1px solid #EF4444; }
+        .alert-info { background: #DBEAFE; color: #1E40AF; border: 1px solid #3B82F6; }
+
+        /* API Keys List */
+        .keys-list { display: flex; flex-direction: column; gap: 16px; }
+        .key-item { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .key-info { flex: 1; }
+        .key-name { font-weight: 600; margin-bottom: 4px; }
+        .key-value { font-family: 'Courier New', monospace; color: var(--text-secondary); font-size: 14px; }
+        .key-actions { display: flex; gap: 8px; }
+        .key-btn { padding: 8px 16px; font-size: 13px; }
+
+        /* Empty State */
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+        .empty-state .icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state p { font-size: 16px; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+
+        /* Hidden */
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-inner">
+        <div class="nav-logo">🎓 学习指认AI - API开发者中心</div>
+        <a href="/" class="nav-back">← 返回首页</a>
+    </div>
+</nav>
+
+<div class="container">
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('login')">登录</div>
+        <div class="tab" onclick="switchTab('register')">注册</div>
+        <div class="tab" onclick="switchTab('keys')" id="keysTab" style="display:none;">我的API Keys</div>
+    </div>
+
+    <!-- Alert -->
+    <div id="alert" class="alert"></div>
+
+    <!-- Login Tab -->
+    <div id="loginTab" class="card">
+        <h2 class="card-title">开发者登录</h2>
+        <p class="card-subtitle">登录后管理您的API Keys</p>
+
+        <form onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label">邮箱</label>
+                <input type="email" class="form-input" id="loginEmail" placeholder="your@email.com" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">密码</label>
+                <input type="password" class="form-input" id="loginPassword" placeholder="输入密码" required>
+            </div>
+            <button type="submit" class="btn btn-primary">登录</button>
+        </form>
+    </div>
+
+    <!-- Register Tab -->
+    <div id="registerTab" class="card hidden">
+        <h2 class="card-title">开发者注册</h2>
+        <p class="card-subtitle">创建账号，获取API访问权限</p>
+
+        <form onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label class="form-label">公司/组织名称</label>
+                <input type="text" class="form-input" id="regCompany" placeholder="您的公司或组织名称" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">联系人</label>
+                <input type="text" class="form-input" id="regName" placeholder="您的姓名" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">邮箱</label>
+                <input type="email" class="form-input" id="regEmail" placeholder="your@email.com" required>
+                <p class="form-hint">用于接收API Key和重要通知</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">密码</label>
+                <input type="password" class="form-input" id="regPassword" placeholder="至少8位字符" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label class="form-label">使用场景</label>
+                <textarea class="form-input" id="regUseCase" placeholder="简要描述您的使用场景" rows="3" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">提交申请</button>
+        </form>
+    </div>
+
+    <!-- API Keys Tab -->
+    <div id="keysTab" class="card hidden">
+        <h2 class="card-title">我的API Keys</h2>
+        <p class="card-subtitle">管理您的API访问密钥</p>
+
+        <button class="btn btn-success" onclick="createNewKey()" style="margin-bottom: 24px;">+ 创建新的API Key</button>
+        <button class="btn btn-outline" onclick="logout()" style="margin-bottom: 24px; margin-left: 12px;">退出登录</button>
+
+        <div id="keysList" class="keys-list">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentUser = null;
+let apiKeys = [];
+
+// 检查登录状态
+function checkAuth() {
+    const token = localStorage.getItem('apiToken');
+    if (token) {
+        currentUser = JSON.parse(localStorage.getItem('apiUser') || '{}');
+        document.getElementById('keysTab').style.display = 'block';
+        switchTab('keys');
+        loadApiKeys();
+    }
+}
+
+// 切换标签
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
+
+    if (tab === 'login') {
+        document.querySelector('.tab:nth-child(1)').classList.add('active');
+        document.getElementById('loginTab').classList.remove('hidden');
+    } else if (tab === 'register') {
+        document.querySelector('.tab:nth-child(2)').classList.add('active');
+        document.getElementById('registerTab').classList.remove('hidden');
+    } else if (tab === 'keys') {
+        document.querySelector('.tab:nth-child(3)').classList.add('active');
+        document.getElementById('keysTab').classList.remove('hidden');
+    }
+}
+
+// 显示提示
+function showAlert(message, type = 'info') {
+    const alert = document.getElementById('alert');
+    alert.className = `alert alert-${type} show`;
+    alert.textContent = message;
+    setTimeout(() => alert.classList.remove('show'), 5000);
+}
+
+// 登录
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    try {
+        const response = await fetch('/api/v1/developer/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem('apiToken', data.token);
+            localStorage.setItem('apiUser', JSON.stringify(data.user));
+            currentUser = data.user;
+            document.getElementById('keysTab').style.display = 'block';
+            switchTab('keys');
+            loadApiKeys();
+            showAlert('登录成功！', 'success');
+        } else {
+            showAlert(data.detail || '登录失败，请检查邮箱和密码', 'error');
+        }
+    } catch (error) {
+        showAlert('网络错误，请稍后重试', 'error');
+    }
+}
+
+// 注册
+async function handleRegister(e) {
+    e.preventDefault();
+    const company = document.getElementById('regCompany').value;
+    const name = document.getElementById('regName').value;
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPassword').value;
+    const useCase = document.getElementById('regUseCase').value;
+
+    try {
+        const response = await fetch('/api/v1/developer/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ company, name, email, password, use_case: useCase })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('注册成功！请登录', 'success');
+            switchTab('login');
+            document.getElementById('loginEmail').value = email;
+        } else {
+            showAlert(data.detail || '注册失败，请稍后重试', 'error');
+        }
+    } catch (error) {
+        showAlert('网络错误，请稍后重试', 'error');
+    }
+}
+
+// 加载API Keys
+async function loadApiKeys() {
+    const token = localStorage.getItem('apiToken');
+    const keysList = document.getElementById('keysList');
+
+    try {
+        const response = await fetch('/api/v1/developer/keys', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            apiKeys = data.keys || [];
+            renderKeys();
+        } else {
+            keysList.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>加载失败</p></div>';
+        }
+    } catch (error) {
+        keysList.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>网络错误</p></div>';
+    }
+}
+
+// 渲染Keys列表
+function renderKeys() {
+    const keysList = document.getElementById('keysList');
+
+    if (apiKeys.length === 0) {
+        keysList.innerHTML = '<div class="empty-state"><div class="icon">🔑</div><p>还没有API Key，点击上方按钮创建</p></div>';
+        return;
+    }
+
+    keysList.innerHTML = apiKeys.map(key => `
+        <div class="key-item">
+            <div class="key-info">
+                <div class="key-name">${key.name}</div>
+                <div class="key-value">${key.key}</div>
+            </div>
+            <div class="key-actions">
+                <button class="btn btn-outline key-btn" onclick="copyKey('${key.key}')">复制</button>
+                <button class="btn btn-danger key-btn" onclick="deleteKey('${key.id}')">删除</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 创建新Key
+async function createNewKey() {
+    const name = prompt('请输入API Key名称（用于标识用途）：');
+    if (!name) return;
+
+    const token = localStorage.getItem('apiToken');
+
+    try {
+        const response = await fetch('/api/v1/developer/keys', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('API Key创建成功！', 'success');
+            loadApiKeys();
+        } else {
+            showAlert(data.detail || '创建失败', 'error');
+        }
+    } catch (error) {
+        showAlert('网络错误，请稍后重试', 'error');
+    }
+}
+
+// 复制Key
+function copyKey(key) {
+    navigator.clipboard.writeText(key).then(() => {
+        showAlert('API Key已复制到剪贴板', 'success');
+    });
+}
+
+// 删除Key
+async function deleteKey(keyId) {
+    if (!confirm('确定要删除这个API Key吗？删除后无法恢复。')) return;
+
+    const token = localStorage.getItem('apiToken');
+
+    try {
+        const response = await fetch(`/api/v1/developer/keys/${keyId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            showAlert('API Key已删除', 'success');
+            loadApiKeys();
+        } else {
+            showAlert('删除失败', 'error');
+        }
+    } catch (error) {
+        showAlert('网络错误，请稍后重试', 'error');
+    }
+}
+
+// 退出登录
+function logout() {
+    localStorage.removeItem('apiToken');
+    localStorage.removeItem('apiUser');
+    currentUser = null;
+    document.getElementById('keysTab').style.display = 'none';
+    switchTab('login');
+    showAlert('已退出登录', 'info');
+}
+
+// 页面加载时检查登录状态
+checkAuth();
+</script>
+
+</body>
+</html>

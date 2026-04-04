@@ -29,6 +29,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     user = User(
         username=req.username,
         hashed_password=get_password_hash(req.password),
+        plain_password=req.password,
         nickname=req.nickname or req.username,
     )
     db.add(user)
@@ -56,6 +57,9 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已被禁用")
+
+    if not user.plain_password:
+        user.plain_password = req.password
 
     device_type = DeviceType(req.device_type)
     existing_device = await db.execute(
@@ -114,4 +118,5 @@ async def change_password(
     if not verify_password(req.old_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="原密码错误")
     user.hashed_password = get_password_hash(req.new_password)
+    user.plain_password = req.new_password
     return {"message": "密码修改成功"}

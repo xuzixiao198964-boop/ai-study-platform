@@ -37,6 +37,283 @@
     <p>学习指认AI 加载中...</p>
   </div>
 
+  <script>
+    // ================================================================
+    // STT (Speech-to-Text) bridge with continuous voice chat
+    // ================================================================
+    var _stt = {
+      supported: false, secureContext: false, protocol: '',
+      userActive: false, finalText: '', interimText: '',
+      error: null, ended: false, recognition: null,
+      lastResultMs: 0, silenceTimer: null, SILENCE_MS: 1000
+    };
+
+    (function() {
+      _stt.secureContext = (window.isSecureContext === true);
+      _stt.protocol = window.location.protocol;
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      _stt.supported = !!SR;
+    })();
+
+    window.sttGetInfo = function() {
+      return JSON.stringify({ supported: _stt.supported, secureContext: _stt.secureContext, protocol: _stt.protocol });
+    };
+
+    function _sttBindEvents(rec) {
+      rec.onresult = function(e) {
+        var ft = '', it = '';
+        for (var i = 0; i < e.results.length; i++) {
+          if (e.results[i].isFinal) ft += e.results[i][0].transcript;
+          else it += e.results[i][0].transcript;
+        }
+        _stt.finalText = ft;
+        _stt.interimText = it;
+        _stt.lastResultMs = Date.now();
+      };
+      rec.onend = function() {
+        if (_stt.userActive) {
+          try { rec.start(); } catch(e) { _stt.userActive = false; _stt.ended = true; _sttClearSilenceWatch(); }
+        }
+      };
+      rec.onerror = function(ev) {
+        if (ev.error === 'aborted') return;
+        if (ev.error === 'no-speech' && _stt.userActive) {
+          try { rec.start(); } catch(e) { _stt.userActive = false; _stt.ended = true; }
+          return;
+        }
+        _stt.error = ev.error; _stt.userActive = false; _stt.ended = true; _sttClearSilenceWatch();
+      };
+    }
+
+    function _sttStartSilenceWatch() {
+      _sttClearSilenceWatch();
+      _stt.silenceTimer = setInterval(function() {
+        if (!_stt.userActive) { _sttClearSilenceWatch(); return; }
+        var text = (_stt.finalText + _stt.interimText).trim();
+        if (text.length === 0 || _stt.lastResultMs === 0) return;
+        var elapsed = Date.now() - _stt.lastResultMs;
+        // 只在达到阈值时触发一次
+        if (elapsed >= _stt.SILENCE_MS && elapsed < _stt.SILENCE_MS + 300) {
+          _vcOnSilence(text);
+        }
+      }, 200);
+    }
+    function _sttClearSilenceWatch() {
+      if (_stt.silenceTimer) { clearInterval(_stt.silenceTimer); _stt.silenceTimer = null; }
+    }
+
+    window.sttStart = function(lang) {
+      sttStop();
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { _stt.error = 'NOT_SUPPORTED'; _stt.ended = true; return; }
+      var rec = new SR();
+      rec.lang = lang || 'zh-CN'; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+      _stt.finalText = ''; _stt.interimText = ''; _stt.error = null; _stt.ended = false;
+      _stt.lastResultMs = 0; _stt.userActive = true; _stt.recognition = rec;
+      _vc.carryOver = ''; _vc.holdMode = false;
+      _sttBindEvents(rec); rec.start(); _sttStartSilenceWatch();
+    };
+
+    window.sttStop = function() {
+      _stt.userActive = false; _sttClearSilenceWatch();
+      if (_vc.pendingXhr) { try { _vc.pendingXhr.abort(); } catch(e){} _vc.pendingXhr = null; }
+      if (_stt.recognition) { try { _stt.recognition.stop(); } catch(e){} _stt.recognition = null; }
+    };
+
+    window.sttPoll = function() {
+      var text = (_stt.finalText + _stt.interimText).trim();
+      var hasText = text.length > 0;
+      var silenceMs = 0;
+      if (hasText && _stt.lastResultMs > 0) {
+        silenceMs = Date.now() - _stt.lastResultMs;
+      }
+      return JSON.stringify({
+        text: text,
+        hasText: hasText,
+        silenceMs: silenceMs,
+        listening: _stt.userActive,
+        error: _stt.error,
+        ended: _stt.ended
+      });
+    };
+
+    window.sttReset = function() {
+      _stt.finalText = ''; _stt.interimText = ''; _stt.error = null; _stt.ended = false; _stt.lastResultMs = 0;
+    };
+
+    // ================================================================
+    // TTS (Text-to-Speech) bridge
+    // ================================================================
+    var _tts = { speaking: false, voiceUri: '' };
+
+    window.ttsSpeak = function(text, rate, pitch) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'zh-CN'; u.rate = rate || 1.0; u.pitch = pitch || 1.0;
+      if (_tts.voiceUri) {
+        var voices = window.speechSynthesis.getVoices();
+        for (var i = 0; i < voices.length; i++) {
+          if (voices[i].voiceURI === _tts.voiceUri) { u.voice = voices[i]; break; }
+        }
+      }
+      _tts.speaking = true;
+      u.onend = function() { _tts.speaking = false; };
+      u.onerror = function() { _tts.speaking = false; };
+      window.speechSynthesis.speak(u);
+    };
+    window.ttsStop = function() { if (window.speechSynthesis) window.speechSynthesis.cancel(); _tts.speaking = false; };
+    window.ttsSetVoice = function(v) { _tts.voiceUri = v || ''; };
+    window.ttsGetVoices = function() {
+      var all = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+      var zh = all.filter(function(v) { return v.lang.indexOf('zh') >= 0; });
+      if (zh.length === 0) zh = all;
+      return JSON.stringify(zh.map(function(v) { return { name: v.name, lang: v.lang, uri: v.voiceURI, isDefault: v.default }; }));
+    };
+    window.ttsIsSpeaking = function() { return window.speechSynthesis ? window.speechSynthesis.speaking : false; };
+    window.ttsIsSupported = function() { return !!window.speechSynthesis; };
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = function() { window.speechSynthesis.getVoices(); };
+    }
+
+    // ================================================================
+    // Voice Chat Controller — continuous voice conversation
+    //   - Silence 1.0s → auto-send to LLM (recognition continues)
+    //   - "还没说完" → hold, accumulate, wait for next silence
+    //   - LLM reply → TTS auto-play
+    // ================================================================
+    var _vc = {
+      token: '',
+      sessionId: '',
+      pendingXhr: null,
+      carryOver: '',
+      holdMode: false,
+      lastSentText: '',
+      holdPatterns: ['还没说完', '我没说完', '没说完呢', '还没有说完', '等一下', '等等', '别急', '等我说完']
+    };
+
+    (function() {
+      var _origOpen = XMLHttpRequest.prototype.open;
+      var _origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+      var _origSend = XMLHttpRequest.prototype.send;
+
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this._vcMethod = method; this._vcUrl = url;
+
+        if (url && url.indexOf('/init/profile') >= 0 && method.toUpperCase() === 'GET') {
+          var self = this;
+          self.addEventListener('load', function() {
+            try {
+              if (self.status === 200 && (self.responseType === '' || self.responseType === 'text')) {
+                if (self.responseText && self.responseText !== 'null' && self.responseText.trim().length > 2) {
+                  try { localStorage.setItem('_profile_cache', self.responseText); } catch(e) {}
+                }
+              }
+            } catch(e) {}
+          });
+          self.addEventListener('error', function() {
+            var cached = localStorage.getItem('_profile_cache');
+            if (cached) {
+              try {
+                Object.defineProperty(self, 'status', { value: 200, configurable: true });
+                Object.defineProperty(self, 'responseText', { value: cached, configurable: true });
+                Object.defineProperty(self, 'response', { value: cached, configurable: true });
+              } catch(e) {}
+            }
+          });
+        }
+        if (url && url.indexOf('/init/setup') >= 0 && method.toUpperCase() === 'POST') {
+          var self2 = this;
+          self2.addEventListener('load', function() {
+            try {
+              if (self2.responseType === '' || self2.responseType === 'text') {
+                if (self2.status === 200 && self2.responseText) {
+                  try { localStorage.setItem('_profile_cache', self2.responseText); } catch(e) {}
+                }
+              }
+            } catch(e) {}
+          });
+        }
+
+        return _origOpen.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+        if (name === 'Authorization' || name === 'authorization') { _vc.token = value; }
+        return _origSetHeader.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function(body) {
+        if (this._vcUrl && this._vcUrl.indexOf('/chat/message') >= 0 && body) {
+          try { var d = JSON.parse(body); if (d.session_id) _vc.sessionId = d.session_id; } catch(e) {}
+        }
+        // 移除这里的TTS调用，让Flutter端控制TTS播放
+        return _origSend.apply(this, arguments);
+      };
+    })();
+
+    function _vcStripHoldPhrases(text) {
+      var t = text;
+      for (var i = 0; i < _vc.holdPatterns.length; i++) {
+        while (t.indexOf(_vc.holdPatterns[i]) >= 0) t = t.replace(_vc.holdPatterns[i], '');
+      }
+      return t.replace(/[，,。.、\s]+$/g, '').trim();
+    }
+
+    function _vcContainsHold(text) {
+      for (var i = 0; i < _vc.holdPatterns.length; i++) {
+        if (text.indexOf(_vc.holdPatterns[i]) >= 0) return true;
+      }
+      return false;
+    }
+
+    function _vcOnSilence(rawText) {
+      if (rawText === _vc.lastSentText) return;
+      if (_vcContainsHold(rawText)) {
+        _vc.holdMode = true;
+        _vc.carryOver = _vcStripHoldPhrases(rawText);
+        if (_vc.pendingXhr) { try { _vc.pendingXhr.abort(); } catch(e){} _vc.pendingXhr = null; }
+        ttsStop();
+        _stt.lastResultMs = Date.now();
+        return;
+      }
+      var cleanText = _vcStripHoldPhrases(rawText);
+      var fullMessage = _vc.carryOver ? (_vc.carryOver + '，' + cleanText) : cleanText;
+      if (!fullMessage.trim()) return;
+      _vc.holdMode = false; _vc.carryOver = '';
+      // 更新lastSentText防止重复发送
+      _vc.lastSentText = rawText;
+      // 重置文本和时间戳，防止再次触发
+      _stt.finalText = ''; _stt.interimText = ''; _stt.lastResultMs = 0;
+      if (!_vc.token || !_vc.sessionId) {
+        _stt.finalText = fullMessage;
+        return;
+      }
+      if (_vc.pendingXhr) { try { _vc.pendingXhr.abort(); } catch(e){} _vc.pendingXhr = null; }
+      ttsStop();
+      var apiBase = window.location.origin + '/api/v1';
+      var xhr = new XMLHttpRequest();
+      _vc.pendingXhr = xhr;
+      xhr.open('POST', apiBase + '/chat/message');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Authorization', _vc.token);
+      xhr.onload = function() {
+        _vc.pendingXhr = null;
+        try {
+          if (xhr.responseType === '' || xhr.responseType === 'text') {
+            var data = JSON.parse(xhr.responseText);
+            if (data.reply && data.reply.trim()) {
+              ttsSpeak(data.reply.trim(), 1.0, 1.0);
+            }
+          }
+        } catch(e) {}
+      };
+      xhr.onerror = function() { _vc.pendingXhr = null; };
+      xhr.ontimeout = function() { _vc.pendingXhr = null; };
+      xhr.timeout = 30000;
+      xhr.send(JSON.stringify({ session_id: _vc.sessionId, content: fullMessage, scene: 'chat' }));
+    }
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

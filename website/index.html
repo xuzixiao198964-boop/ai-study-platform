@@ -10,6 +10,7 @@
             --primary: #4F6AF6;
             --primary-dark: #3D56D4;
             --accent: #FF6B6B;
+            --success: #10B981;
             --bg: #F7F8FC;
             --card: #FFFFFF;
             --text: #1A1D2E;
@@ -24,9 +25,10 @@
         .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
         .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; }
         .nav-logo { font-size: 20px; font-weight: 700; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .nav-links { display: flex; gap: 32px; }
+        .nav-links { display: flex; gap: 32px; align-items: center; }
         .nav-links a { color: var(--text-secondary); font-size: 15px; transition: color .2s; }
         .nav-links a:hover { color: var(--primary); }
+        .nav-btn { padding: 8px 20px; background: var(--gradient); color: #fff; border-radius: 8px; font-weight: 600; font-size: 14px; }
 
         /* Hero */
         .hero { padding: 140px 24px 80px; text-align: center; background: linear-gradient(180deg, #EEF0FF 0%, var(--bg) 100%); }
@@ -38,6 +40,8 @@
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79,106,246,0.5); }
         .btn-outline { background: var(--card); color: var(--primary); border: 2px solid var(--primary); }
         .btn-outline:hover { background: var(--primary); color: #fff; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.4); }
 
         /* Section */
         .section { max-width: 1200px; margin: 0 auto; padding: 80px 24px; }
@@ -51,6 +55,14 @@
         .feature-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 20px; }
         .feature-card h3 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
         .feature-card p { color: var(--text-secondary); font-size: 15px; }
+
+        /* Quick Access */
+        .quick-access { background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 24px; padding: 64px 40px; text-align: center; color: #fff; margin-bottom: 80px; }
+        .quick-access h2 { font-size: 36px; margin-bottom: 16px; }
+        .quick-access p { font-size: 18px; opacity: 0.9; margin-bottom: 32px; }
+        .quick-links { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+        .quick-link { display: inline-flex; align-items: center; gap: 8px; padding: 16px 32px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; color: #fff; font-size: 16px; font-weight: 600; transition: all .3s; }
+        .quick-link:hover { background: rgba(255,255,255,0.3); transform: translateY(-2px); }
 
         /* Download */
         .download-section { background: linear-gradient(135deg, #4F6AF6 0%, #6C5CE7 50%, #A855F7 100%); border-radius: 24px; padding: 64px 40px; text-align: center; color: #fff; }
@@ -66,15 +78,22 @@
         .download-btn:hover { transform: scale(1.05); }
         .download-btn.disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* PWA Guide */
-        .guide-steps { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
-        .guide-step { background: var(--card); border-radius: 16px; padding: 28px; border: 1px solid var(--border); width: 260px; text-align: center; }
-        .guide-step .step-num { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
-        .guide-step h4 { font-size: 16px; margin-bottom: 8px; }
-        .guide-step p { font-size: 14px; color: var(--text-secondary); }
+        /* API Section */
+        .api-section { background: var(--card); border-radius: 24px; padding: 64px 40px; border: 1px solid var(--border); }
+        .api-section h2 { text-align: center; font-size: 36px; margin-bottom: 16px; }
+        .api-section .subtitle { text-align: center; font-size: 18px; color: var(--text-secondary); margin-bottom: 48px; }
+        .api-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-bottom: 40px; }
+        .api-feature { text-align: center; }
+        .api-feature .icon { font-size: 48px; margin-bottom: 16px; }
+        .api-feature h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+        .api-feature p { font-size: 14px; color: var(--text-secondary); }
+        .api-cta { text-align: center; }
 
         /* Footer */
         .footer { border-top: 1px solid var(--border); padding: 40px 24px; text-align: center; color: var(--text-secondary); font-size: 14px; }
+        .footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; }
+        .footer-links a { color: var(--text-secondary); transition: color .2s; }
+        .footer-links a:hover { color: var(--primary); }
 
         /* Responsive */
         @media (max-width: 768px) {
@@ -83,7 +102,7 @@
             .section-title { font-size: 28px; }
             .features-grid { grid-template-columns: 1fr; }
             .nav-links { display: none; }
-            .download-section { padding: 40px 20px; }
+            .download-section, .quick-access, .api-section { padding: 40px 20px; }
         }
     </style>
 </head>
@@ -95,7 +114,7 @@
         <div class="nav-links">
             <a href="#features">核心功能</a>
             <a href="#download">下载客户端</a>
-            <a href="#guide">使用指南</a>
+            <a href="#api">开发者API</a>
         </div>
     </div>
 </nav>
@@ -107,6 +126,7 @@
     <div class="hero-buttons">
         <a href="#download" class="btn btn-primary">📱 下载客户端</a>
         <a href="#features" class="btn btn-outline">了解更多</a>
+        <a href="#api" class="btn btn-outline">开发者API</a>
     </div>
 </section>
 
@@ -169,43 +189,54 @@
             <div class="download-card">
                 <div class="icon">🌐</div>
                 <h3>网页版 (PWA)</h3>
-                <p>无需安装，Safari 浏览器直接访问使用</p>
-                <a href="http://101.201.244.150:8000" class="download-btn" target="_blank">立即访问</a>
+                <p>无需安装，浏览器直接访问使用</p>
+                <a href="https://45.78.5.184:8000" class="download-btn" target="_blank">立即访问</a>
             </div>
         </div>
     </div>
 </section>
 
-<!-- PWA Guide -->
-<section class="section" id="guide">
-    <h2 class="section-title">iPad PWA 安装指南</h2>
-    <p class="section-subtitle">无需 App Store，将网页版添加到主屏幕即可获得类原生体验</p>
-    <div class="guide-steps">
-        <div class="guide-step">
-            <div class="step-num">1</div>
-            <h4>打开 Safari</h4>
-            <p>在 iPad 上使用 Safari 浏览器访问<br><strong>http://101.201.244.150:8000</strong></p>
+<!-- API Section -->
+<section class="section" id="api">
+    <div class="api-section">
+        <h2>开发者API</h2>
+        <p class="subtitle">开放AI能力，让更多应用接入智能学习辅导</p>
+        <div class="api-features">
+            <div class="api-feature">
+                <div class="icon">🤖</div>
+                <h3>AI对话接口</h3>
+                <p>接入DeepSeek大模型，支持多轮对话和上下文理解</p>
+            </div>
+            <div class="api-feature">
+                <div class="icon">📝</div>
+                <h3>OCR识别</h3>
+                <p>高精度题目识别，支持手写体和印刷体</p>
+            </div>
+            <div class="api-feature">
+                <div class="icon">✅</div>
+                <h3>智能批改</h3>
+                <p>自动批改作业，生成详细讲解和错题分析</p>
+            </div>
+            <div class="api-feature">
+                <div class="icon">🎙️</div>
+                <h3>语音服务</h3>
+                <p>语音识别和语音合成，支持多种音色和语速</p>
+            </div>
         </div>
-        <div class="guide-step">
-            <div class="step-num">2</div>
-            <h4>点击分享按钮</h4>
-            <p>点击 Safari 底部工具栏中间的 <strong>分享</strong> 图标（方框+箭头）</p>
-        </div>
-        <div class="guide-step">
-            <div class="step-num">3</div>
-            <h4>添加到主屏幕</h4>
-            <p>在弹出菜单中选择 <strong>"添加到主屏幕"</strong></p>
-        </div>
-        <div class="guide-step">
-            <div class="step-num">4</div>
-            <h4>开始使用</h4>
-            <p>主屏幕出现应用图标，点击即可全屏使用</p>
+        <div class="api-cta">
+            <a href="/api-portal" class="btn btn-primary">申请API Key</a>
+            <a href="/api-docs" class="btn btn-outline" style="margin-left: 16px;">查看文档</a>
         </div>
     </div>
 </section>
 
 <!-- Footer -->
 <footer class="footer">
+    <div class="footer-links">
+        <a href="#features">产品功能</a>
+        <a href="#download">下载客户端</a>
+        <a href="#api">开发者API</a>
+    </div>
     <p>© 2026 学习指认AI — K12智能学习辅导平台</p>
 </footer>
 

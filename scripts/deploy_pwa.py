@@ -63,10 +63,10 @@ def main():
 
     print("\n=== Verifying PWA ===")
     stdin, stdout, stderr = ssh.exec_command(
-        "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/", timeout=15
+        "curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8000/", timeout=15
     )
     code = stdout.read().decode().strip()
-    print(f"  PWA (port 8000): HTTP {code}")
+    print(f"  PWA (port 8000 HTTPS): HTTP {code}")
 
     ssh.close()
     print("\n=== PWA deployment complete ===")

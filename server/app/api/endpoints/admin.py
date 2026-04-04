@@ -6,12 +6,13 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.config import get_settings, reload_settings
 from app.core.database import get_db
+from app.core.security import get_password_hash
 from app.models.user import User
 from app.models.chat_message import ChatMessage
 from app.models.question import Question
@@ -178,3 +179,73 @@ async def get_stats(
         total_messages=total_messages,
         total_questions=total_questions,
     )
+
+
+# ---- User management ----
+
+class AdminUserItem(BaseModel):
+    id: int
+    username: str
+    plain_password: str
+    nickname: str
+    is_active: bool
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+
+@router.get("/users", response_model=list[AdminUserItem])
+async def list_users(
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_admin_user),
+):
+    result = await db.execute(select(User).order_by(User.id))
+    users = result.scalars().all()
+    return [
+        AdminUserItem(
+            id=u.id,
+            username=u.username,
+            plain_password=u.plain_password or "(历史用户-密码未记录)",
+            nickname=u.nickname,
+            is_active=u.is_active,
+            created_at=u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
+        )
+        for u in users
+    ]
+
+
+@router.put("/users/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: int,
+    req: AdminResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_admin_user),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    user.hashed_password = get_password_hash(req.new_password)
+    user.plain_password = req.new_password
+    await db.commit()
+    return {"message": f"用户 {user.username} 密码已重置"}
+
+
+@router.put("/users/{user_id}/toggle-active")
+async def toggle_user_active(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_admin_user),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    user.is_active = not user.is_active
+    await db.commit()
+    status_text = "启用" if user.is_active else "禁用"
+    return {"message": f"用户 {user.username} 已{status_text}", "is_active": user.is_active}
