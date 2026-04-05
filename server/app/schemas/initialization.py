@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class InitSetupRequest(BaseModel):
-    grade: int
+    grade: int | str  # 支持整数或字符串（如"小学三年级"）
     province: str = ""
     city: str = ""
     district: str = ""
