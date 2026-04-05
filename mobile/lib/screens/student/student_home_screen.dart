@@ -649,8 +649,8 @@ class _ChatViewState extends State<_ChatView> {
         _currentTTSAudio = null;
       }
 
-      // 不停止语音识别，保持长连接模式
-      // 但需要标记TTS正在播放，避免回声被识别
+      // 长连接模式：语音识别保持运行，不停止
+      // 依靠浏览器内置的回声消除功能过滤系统播放的声音
 
       // 调用后端TTS API，使用用户选择的声音
       final url = 'https://45.78.5.184:8000/api/v1/tts/speak?voice_id=${widget.aiVoice}&text=${Uri.encodeComponent(text)}';
@@ -661,15 +661,6 @@ class _ChatViewState extends State<_ChatView> {
       _currentTTSAudio!.setAttribute('playsinline', 'true');
       _currentTTSAudio!.setAttribute('webkit-playsinline', 'true');
       _currentTTSAudio!.setAttribute('preload', 'auto');
-
-      // 监听播放开始 - 停止语音识别避免回声
-      _currentTTSAudio!.onPlay.listen((_) {
-        print('[TTS] 开始播放，暂停语音识别');
-        if (_isListening) {
-          _speech.stop();
-          setState(() => _isListening = false);
-        }
-      });
 
       // 监听加载完成
       _currentTTSAudio!.onCanPlay.listen((_) {
@@ -683,18 +674,12 @@ class _ChatViewState extends State<_ChatView> {
       _currentTTSAudio!.onError.listen((e) {
         print('[TTS] 音频错误: $e');
         _currentTTSAudio = null;
-        // 恢复语音识别
-        _autoStartListening();
       });
 
-      // 播放结束后恢复语音识别
+      // 播放结束
       _currentTTSAudio!.onEnded.listen((_) {
-        print('[TTS] 播放结束，恢复语音识别');
+        print('[TTS] 播放结束');
         _currentTTSAudio = null;
-        // 延迟300ms后恢复识别，避免尾音被捕获
-        Future.delayed(const Duration(milliseconds: 300), () {
-          _autoStartListening();
-        });
       });
 
       // 预加载并播放音频
