@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.endpoints import (
     auth, questions, error_books, permissions, sync, study_records,
-    chat, initialization, admin, regions, developer,
+    chat, initialization, admin, regions, developer, tts,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -17,4 +17,5 @@ api_router.include_router(chat.router)
 api_router.include_router(initialization.router)
 api_router.include_router(admin.router)
 api_router.include_router(regions.router)
+api_router.include_router(tts.router)
 api_router.include_router(developer.router, prefix="/developer", tags=["developer"])

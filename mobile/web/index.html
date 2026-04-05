@@ -45,7 +45,8 @@
       supported: false, secureContext: false, protocol: '',
       userActive: false, finalText: '', interimText: '',
       error: null, ended: false, recognition: null,
-      lastResultMs: 0, silenceTimer: null, SILENCE_MS: 1000
+      lastResultMs: 0, silenceTimer: null, SILENCE_MS: 1000,
+      silenceTriggered: false  // 防止重复触发
     };
 
     (function() {
@@ -69,10 +70,18 @@
         _stt.finalText = ft;
         _stt.interimText = it;
         _stt.lastResultMs = Date.now();
+        _stt.silenceTriggered = false;  // 有新内容时重置触发标志
+        console.log('[STT] 识别结果:', ft || it, '时间:', _stt.lastResultMs);
       };
       rec.onend = function() {
+        console.log('[STT] onend, userActive:', _stt.userActive, 'ttsSpeaking:', _tts.speaking);
+        // 如果TTS正在播放，不要重启识别
+        if (_tts.speaking) {
+          console.log('[STT] TTS播放中，暂不重启识别');
+          return;
+        }
         if (_stt.userActive) {
-          try { rec.start(); } catch(e) { _stt.userActive = false; _stt.ended = true; _sttClearSilenceWatch(); }
+          try { rec.start(); console.log('[STT] 重启识别'); } catch(e) { _stt.userActive = false; _stt.ended = true; _sttClearSilenceWatch(); }
         }
       };
       rec.onerror = function(ev) {
@@ -81,6 +90,7 @@
           try { rec.start(); } catch(e) { _stt.userActive = false; _stt.ended = true; }
           return;
         }
+        console.error('[STT] 错误:', ev.error);
         _stt.error = ev.error; _stt.userActive = false; _stt.ended = true; _sttClearSilenceWatch();
       };
     }
@@ -91,9 +101,12 @@
         if (!_stt.userActive) { _sttClearSilenceWatch(); return; }
         var text = (_stt.finalText + _stt.interimText).trim();
         if (text.length === 0 || _stt.lastResultMs === 0) return;
+
         var elapsed = Date.now() - _stt.lastResultMs;
         // 只在达到阈值时触发一次
-        if (elapsed >= _stt.SILENCE_MS && elapsed < _stt.SILENCE_MS + 300) {
+        if (elapsed >= _stt.SILENCE_MS && !_stt.silenceTriggered) {
+          _stt.silenceTriggered = true;  // 标记已触发
+          console.log('[静默检测] 触发发送, 静默时长:', elapsed, 'ms, 文本:', text);
           _vcOnSilence(text);
         }
       }, 200);
@@ -147,20 +160,67 @@
     var _tts = { speaking: false, voiceUri: '' };
 
     window.ttsSpeak = function(text, rate, pitch) {
-      if (!window.speechSynthesis) return;
+      console.log('[TTS] ttsSpeak调用, text:', text, 'supported:', !!window.speechSynthesis);
+      if (!window.speechSynthesis) {
+        console.error('[TTS] speechSynthesis不支持');
+        return;
+      }
       window.speechSynthesis.cancel();
+
+      // iPad/iOS兼容性修复：需要用户交互触发
       var u = new SpeechSynthesisUtterance(text);
-      u.lang = 'zh-CN'; u.rate = rate || 1.0; u.pitch = pitch || 1.0;
-      if (_tts.voiceUri) {
-        var voices = window.speechSynthesis.getVoices();
+      u.lang = 'zh-CN';
+      u.rate = rate || 1.0;
+      u.pitch = pitch || 1.0;
+
+      // 获取中文语音
+      var voices = window.speechSynthesis.getVoices();
+      var zhVoice = voices.find(v => v.lang.startsWith('zh'));
+      if (zhVoice) {
+        u.voice = zhVoice;
+        console.log('[TTS] 使用语音:', zhVoice.name);
+      } else if (_tts.voiceUri) {
         for (var i = 0; i < voices.length; i++) {
           if (voices[i].voiceURI === _tts.voiceUri) { u.voice = voices[i]; break; }
         }
       }
+
       _tts.speaking = true;
-      u.onend = function() { _tts.speaking = false; };
-      u.onerror = function() { _tts.speaking = false; };
+      u.onstart = function() {
+        console.log('[TTS] 开始播放');
+        // 播放开始时停止语音识别，避免回声
+        if (_stt.recognition && _stt.userActive) {
+          try {
+            _stt.recognition.stop();
+            console.log('[TTS] 已停止语音识别以避免回声');
+          } catch(e) {}
+        }
+      };
+      u.onend = function() {
+        _tts.speaking = false;
+        console.log('[TTS] 播放结束');
+        // 播放结束后恢复语音识别
+        if (_stt.userActive) {
+          console.log('[TTS] 恢复语音识别');
+          setTimeout(function() {
+            if (_stt.userActive && !_stt.recognition) {
+              sttStart('zh-CN');
+            }
+          }, 300);
+        }
+      };
+      u.onerror = function(e) {
+        _tts.speaking = false;
+        console.error('[TTS] 播放错误:', e);
+      };
+
+      console.log('[TTS] 调用speak');
       window.speechSynthesis.speak(u);
+
+      // iPad修复：强制开始播放
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
     };
     window.ttsStop = function() { if (window.speechSynthesis) window.speechSynthesis.cancel(); _tts.speaking = false; };
     window.ttsSetVoice = function(v) { _tts.voiceUri = v || ''; };
@@ -267,13 +327,19 @@
     }
 
     function _vcOnSilence(rawText) {
-      if (rawText === _vc.lastSentText) return;
+      console.log('[_vcOnSilence] 收到文本:', rawText, 'lastSentText:', _vc.lastSentText);
+      if (rawText === _vc.lastSentText) {
+        console.log('[_vcOnSilence] 重复文本，跳过');
+        return;
+      }
       if (_vcContainsHold(rawText)) {
+        console.log('[_vcOnSilence] 包含"还没说完"，进入hold模式');
         _vc.holdMode = true;
         _vc.carryOver = _vcStripHoldPhrases(rawText);
         if (_vc.pendingXhr) { try { _vc.pendingXhr.abort(); } catch(e){} _vc.pendingXhr = null; }
         ttsStop();
-        _stt.lastResultMs = Date.now();
+        // 不要重置lastResultMs，让用户继续说话
+        _stt.silenceTriggered = false;  // 重置触发标志
         return;
       }
       var cleanText = _vcStripHoldPhrases(rawText);
@@ -282,14 +348,25 @@
       _vc.holdMode = false; _vc.carryOver = '';
       // 更新lastSentText防止重复发送
       _vc.lastSentText = rawText;
-      // 重置文本和时间戳，防止再次触发
-      _stt.finalText = ''; _stt.interimText = ''; _stt.lastResultMs = 0;
+      // 清空文本，准备接收新内容
+      _stt.finalText = '';
+      _stt.interimText = '';
+      _stt.silenceTriggered = false;  // 重置触发标志，准备下一次
+      // 重置lastResultMs，等待新的语音输入
+      _stt.lastResultMs = Date.now();
+
+      console.log('[_vcOnSilence] 准备发送消息:', fullMessage);
+
       if (!_vc.token || !_vc.sessionId) {
+        console.warn('[_vcOnSilence] token或sessionId未设置');
         _stt.finalText = fullMessage;
         return;
       }
       if (_vc.pendingXhr) { try { _vc.pendingXhr.abort(); } catch(e){} _vc.pendingXhr = null; }
+
+      // 发送前停止TTS，避免回声
       ttsStop();
+
       var apiBase = window.location.origin + '/api/v1';
       var xhr = new XMLHttpRequest();
       _vc.pendingXhr = xhr;
@@ -298,22 +375,48 @@
       xhr.setRequestHeader('Authorization', _vc.token);
       xhr.onload = function() {
         _vc.pendingXhr = null;
+        console.log('[XHR] 响应状态:', xhr.status);
         try {
           if (xhr.responseType === '' || xhr.responseType === 'text') {
             var data = JSON.parse(xhr.responseText);
+            console.log('[XHR] 响应数据:', data);
             if (data.reply && data.reply.trim()) {
+              console.log('[TTS] 准备播放:', data.reply.trim());
+              // 直接播放TTS，不需要手动停止识别（TTS的onstart会处理）
               ttsSpeak(data.reply.trim(), 1.0, 1.0);
+            } else {
+              console.warn('[TTS] 没有reply字段或为空');
             }
           }
-        } catch(e) {}
+        } catch(e) {
+          console.error('[XHR] 解析错误:', e);
+        }
       };
-      xhr.onerror = function() { _vc.pendingXhr = null; };
-      xhr.ontimeout = function() { _vc.pendingXhr = null; };
+      xhr.onerror = function() {
+        _vc.pendingXhr = null;
+        console.error('[XHR] 请求失败');
+      };
+      xhr.ontimeout = function() {
+        _vc.pendingXhr = null;
+        console.error('[XHR] 请求超时');
+      };
       xhr.timeout = 30000;
+      console.log('[XHR] 发送请求:', { session_id: _vc.sessionId, content: fullMessage, scene: 'chat' });
       xhr.send(JSON.stringify({ session_id: _vc.sessionId, content: fullMessage, scene: 'chat' }));
     }
   </script>
 
+  <script>
+    // 完全禁用Service Worker注册
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+          console.log('[SW] 已卸载Service Worker');
+        }
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

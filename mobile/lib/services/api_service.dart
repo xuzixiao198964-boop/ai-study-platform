@@ -256,4 +256,10 @@ class ApiService {
     });
     return resp.data;
   }
+
+  // === TTS声音 ===
+  Future<List<dynamic>> getTTSVoices() async {
+    final resp = await _dio.get('/tts/voices');
+    return resp.data;
+  }
 }

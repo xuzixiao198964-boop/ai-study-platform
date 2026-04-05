@@ -101,30 +101,37 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   void _showSettingsSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('AI 设置', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('AI 名字'),
-              subtitle: Text(_aiName),
-              onTap: () => _editAIName(ctx),
-            ),
-            ListTile(
-              leading: const Icon(Icons.record_voice_over_outlined),
-              title: const Text('声音 & 语速'),
-              subtitle: const Text('温柔女声 · 中速'),
-              onTap: () {},
-            ),
-          ],
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('AI 设置', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('AI 名字'),
+                subtitle: Text(_aiName),
+                onTap: () => _editAIName(ctx),
+              ),
+              ListTile(
+                leading: const Icon(Icons.record_voice_over_outlined),
+                title: const Text('声音 & 语速'),
+                subtitle: const Text('温柔女声 · 中速'),
+                onTap: () {},
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -134,32 +141,36 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     final controller = TextEditingController(text: _aiName);
     showDialog(
       context: parentCtx,
-      builder: (ctx) => AlertDialog(
-        title: const Text('修改 AI 名字'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: '给AI起个名字'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          ElevatedButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isEmpty) return;
-              try {
-                await ApiService().updateAIConfig(aiName: name);
-                setState(() => _aiName = name);
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (parentCtx.mounted) Navigator.pop(parentCtx);
-              } catch (e) {
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('$e')));
-                }
-              }
-            },
-            child: const Text('确定'),
+      builder: (ctx) => Center(
+        child: SingleChildScrollView(
+          child: AlertDialog(
+            title: const Text('修改 AI 名字'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(hintText: '给AI起个名字'),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+              ElevatedButton(
+                onPressed: () async {
+                  final name = controller.text.trim();
+                  if (name.isEmpty) return;
+                  try {
+                    await ApiService().updateAIConfig(aiName: name);
+                    setState(() => _aiName = name);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (parentCtx.mounted) Navigator.pop(parentCtx);
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('$e')));
+                    }
+                  }
+                },
+                child: const Text('确定'),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -167,40 +178,47 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   void _showProfileSheet(BuildContext context, AuthProvider auth) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: AppTheme.primaryColor,
-              child: Text(
-                (auth.user?.nickname ?? '学')[0],
-                style: const TextStyle(fontSize: 28, color: Colors.white),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.4,
+        minChildSize: 0.3,
+        maxChildSize: 0.7,
+        expand: false,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 36,
+                backgroundColor: AppTheme.primaryColor,
+                child: Text(
+                  (auth.user?.nickname ?? '学')[0],
+                  style: const TextStyle(fontSize: 28, color: Colors.white),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(auth.user?.nickname ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text('学生端 · ${auth.user?.username ?? ""}', style: const TextStyle(color: AppTheme.textSecondary)),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  auth.logout();
-                  Navigator.of(context).pushReplacementNamed('/login');
-                },
-                icon: const Icon(Icons.logout, color: AppTheme.errorColor),
-                label: const Text('退出登录', style: TextStyle(color: AppTheme.errorColor)),
+              const SizedBox(height: 12),
+              Text(auth.user?.nickname ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('学生端 · ${auth.user?.username ?? ""}', style: const TextStyle(color: AppTheme.textSecondary)),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    auth.logout();
+                    Navigator.of(context).pushReplacementNamed('/login');
+                  },
+                  icon: const Icon(Icons.logout, color: AppTheme.errorColor),
+                  label: const Text('退出登录', style: TextStyle(color: AppTheme.errorColor)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -231,10 +249,36 @@ class _InitSetupViewState extends State<_InitSetupView> {
   String? _selectedDistrict;
   bool _loadingRegions = true;
 
+  // 声音选择
+  String _selectedVoice = '101001';
+  final TtsService _tts = TtsService();
+  List<Map<String, dynamic>> _voiceOptions = [];
+  bool _loadingVoices = true;
+
   @override
   void initState() {
     super.initState();
     _loadProvinces();
+    _loadVoices();
+  }
+
+  Future<void> _loadVoices() async {
+    try {
+      final voices = await ApiService().getTTSVoices();
+      if (mounted) {
+        setState(() {
+          _voiceOptions = List<Map<String, dynamic>>.from(voices);
+          _loadingVoices = false;
+          if (_voiceOptions.isNotEmpty) {
+            _selectedVoice = _voiceOptions[0]['id'];
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingVoices = false);
+      }
+    }
   }
 
   Future<void> _loadProvinces() async {
@@ -364,6 +408,87 @@ class _InitSetupViewState extends State<_InitSetupView> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 24),
+          const Text('选择AI声音', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          if (_loadingVoices)
+            const Center(child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircularProgressIndicator(),
+            ))
+          else
+            ..._voiceOptions.map((voice) {
+              final voiceId = voice['id'] as String;
+              final voiceName = voice['name'] as String;
+              final voiceDesc = voice['description'] as String;
+              final gender = voice['gender'] as String;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: () {
+                    setState(() => _selectedVoice = voiceId);
+                    _playVoiceSample(voiceName, voiceDesc);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: _selectedVoice == voiceId
+                            ? AppTheme.primaryColor
+                            : Colors.grey.shade300,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      color: _selectedVoice == voiceId
+                          ? AppTheme.primaryColor.withOpacity(0.1)
+                          : Colors.transparent,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _selectedVoice == voiceId
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: _selectedVoice == voiceId
+                              ? AppTheme.primaryColor
+                              : Colors.grey,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                voiceName,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: _selectedVoice == voiceId
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              Text(
+                                voiceDesc,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.play_circle_outline),
+                          onPressed: () => _playVoiceSample(voiceName, voiceDesc),
+                          tooltip: '试听',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: _loading ? null : _submit,
@@ -375,6 +500,11 @@ class _InitSetupViewState extends State<_InitSetupView> {
         ],
       ),
     );
+  }
+
+  void _playVoiceSample(String voiceName, String voiceDesc) {
+    final text = '你好，我是$voiceName，$voiceDesc';
+    _tts.speak(text, rate: 1.0, pitch: 1.0);
   }
 
   Future<void> _submit() async {
@@ -390,6 +520,7 @@ class _InitSetupViewState extends State<_InitSetupView> {
         city: _selectedCity!,
         district: _selectedDistrict!,
         aiName: _nameCtrl.text.trim().isEmpty ? '小智' : _nameCtrl.text.trim(),
+        aiVoice: _selectedVoice,
       );
       widget.onComplete();
     } catch (e) {
@@ -404,6 +535,7 @@ class _InitSetupViewState extends State<_InitSetupView> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _tts.stop();
     super.dispose();
   }
 }
