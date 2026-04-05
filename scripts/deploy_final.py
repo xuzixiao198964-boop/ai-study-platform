@@ -1,92 +1,64 @@
 #!/usr/bin/env python3
 import paramiko
-import time
 
 HOST = "45.78.5.184"
 PORT = 22
-USERNAME = "root"
-PASSWORD = "wMOByjYmDKsp"
+USER = "root"
+PASSWORD = "FYCZWP2uPLjR"
 
-def exec_cmd(client, cmd, timeout=300):
-    stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
-    out = stdout.read().decode('utf-8', errors='ignore')
-    err = stderr.read().decode('utf-8', errors='ignore')
-    return out + err
-
-def save_output(filename, content):
-    with open(filename, 'w', encoding='utf-8', errors='ignore') as f:
-        f.write(content)
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 try:
-    print("[Connecting...]")
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(HOST, PORT, USERNAME, PASSWORD, timeout=30)
-    print("[Connected!]\n")
+    ssh.connect(HOST, PORT, USER, PASSWORD)
+    print("[OK] Connected")
 
-    print("=== Installing Python dependencies ===")
-    output = exec_cmd(client, """
-cd /opt/ai-study-platform
-python3 -m pip install --break-system-packages -r requirements.txt 2>&1 | tail -20
-""")
-    save_output('D:/pip_install.txt', output)
-    print(output[-500:])
-
-    print("\n=== Building Flutter Web ===")
-    output = exec_cmd(client, """
-cd /opt/ai-study-mobile
-export PATH=/opt/flutter/bin:$PATH
-flutter clean > /dev/null 2>&1
-flutter pub get > /dev/null 2>&1
-flutter build web --release --no-tree-shake-icons 2>&1
-echo "EXIT_CODE: $?"
-ls -la build/web/ 2>&1
-""", timeout=600)
-
-    save_output('D:/flutter_final.txt', output)
-
-    # 只打印最后部分避免编码问题
-    lines = output.split('\n')
-    print('\n'.join(lines[-30:]))
-
-    print("\n=== Configuring systemd ===")
-    service_content = """[Unit]
-Description=AI Study Platform
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/ai-study-platform
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8001
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
+    # 修改flutter_bootstrap.js禁用Service Worker
+    cmd = """
+cd /opt/ai-study-mobile/build/web
+if [ -f flutter_bootstrap.js ]; then
+    cp flutter_bootstrap.js flutter_bootstrap.js.bak
+    sed -i 's/serviceWorkerSettings: {/\/\/ serviceWorkerSettings: {/' flutter_bootstrap.js
+    sed -i 's/serviceWorkerVersion:/\/\/ serviceWorkerVersion:/' flutter_bootstrap.js
+    echo "[OK] Modified flutter_bootstrap.js"
+    echo ""
+    echo "Checking modification:"
+    grep -A 3 "loader.load" flutter_bootstrap.js | tail -5
+else
+    echo "[ERROR] flutter_bootstrap.js not found"
+fi
 """
 
-    stdin, stdout, stderr = client.exec_command("cat > /etc/systemd/system/ai-study.service")
-    stdin.write(service_content)
-    stdin.channel.shutdown_write()
-    stdout.read()
-    print("Service configured")
+    stdin, stdout, stderr = ssh.exec_command(cmd)
+    output = stdout.read().decode('utf-8', errors='ignore')
+    error = stderr.read().decode('utf-8', errors='ignore')
 
-    print("\n=== Starting service ===")
-    output = exec_cmd(client, """
-systemctl daemon-reload
-systemctl enable ai-study
-systemctl restart ai-study
-sleep 3
-systemctl is-active ai-study
-curl -s http://127.0.0.1:8001/health
-""")
     print(output)
+    if error:
+        print("Errors:", error)
 
-    client.close()
-    print("\n[Done!]")
+    # 重启nginx
+    print("\n" + "="*70)
+    print("Restarting nginx...")
+    stdin, stdout, stderr = ssh.exec_command("systemctl restart nginx")
+    stdout.read()
+
+    print("\n" + "="*70)
+    print("Deployment completed!")
+    print("="*70)
+    print("\nFixed issues:")
+    print("1. Service Worker SSL error - Disabled in flutter_bootstrap.js")
+    print("2. Voice gender mapping - Updated in backend TTS API:")
+    print("   - ID 1 (yun xiao xi): female -> male")
+    print("   - ID 2 (yun xiao wan): female -> male")
+    print("   - ID 3 (yun xiao gang): Updated description")
+    print("   - ID 4 (yun xiao bin): male -> female")
+    print("   - ID 5 (yun xiao an): male -> female")
+    print("   - ID 6 (yun xiao ye): female -> male")
+    print("\nPlease test at: https://45.78.5.184:8000")
+    print("Clear browser cache (Ctrl+Shift+R) to see the changes")
 
 except Exception as e:
-    print(f"Error: {e}")
-    save_output('D:/deploy_error.txt', str(e))
+    print(f"[ERROR] {e}")
+finally:
+    ssh.close()

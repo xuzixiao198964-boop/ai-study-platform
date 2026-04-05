@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>腾讯云TTS声音测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        h1 { color: #333; }
+        .voice-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .voice-info {
+            flex: 1;
+        }
+        .voice-id {
+            font-weight: bold;
+            color: #4A90D9;
+        }
+        button {
+            padding: 8px 16px;
+            background: #4A90D9;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357ABD;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .gender-male { color: #2196F3; }
+        .gender-female { color: #E91E63; }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>腾讯云TTS声音测试</h1>
+    <p>点击"试听"按钮来听每个声音的实际音色，然后判断性别是否正确</p>
+
+    <div class="status" id="status">准备就绪</div>
+
+    <div id="voices"></div>
+
+    <script>
+        const API_BASE = 'https://45.78.5.184:8000/api/v1';
+
+        const currentVoices = [
+            { id: "0", name: "云小宁", gender: "female", desc: "温柔女声" },
+            { id: "1", name: "云小希", gender: "female", desc: "活力女声" },
+            { id: "2", name: "云小晚", gender: "female", desc: "知性女声" },
+            { id: "3", name: "云小刚", gender: "male", desc: "沉稳男声" },
+            { id: "4", name: "云小彬", gender: "male", desc: "开朗男声" },
+            { id: "5", name: "云小安", gender: "male", desc: "温和男声" },
+            { id: "6", name: "云小叶", gender: "female", desc: "客服女声" },
+            { id: "7", name: "云小欣", gender: "female", desc: "情感女声" },
+            { id: "1001", name: "智瑜", gender: "female", desc: "精品女声" },
+            { id: "1002", name: "智聆", gender: "female", desc: "精品女声" },
+            { id: "1003", name: "智美", gender: "female", desc: "精品女声" }
+        ];
+
+        let currentAudio = null;
+
+        function playVoice(voiceId, voiceName) {
+            const btn = document.getElementById(`btn-${voiceId}`);
+            const status = document.getElementById('status');
+
+            // 停止之前的音频
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '加载中...';
+            status.textContent = `正在加载 ${voiceName} (ID: ${voiceId})...`;
+
+            const url = `${API_BASE}/tts/preview/${voiceId}`;
+            currentAudio = new Audio(url);
+
+            currentAudio.onloadeddata = () => {
+                status.textContent = `播放中: ${voiceName} (ID: ${voiceId})`;
+                currentAudio.play();
+            };
+
+            currentAudio.onended = () => {
+                btn.disabled = false;
+                btn.textContent = '试听';
+                status.textContent = `播放完成: ${voiceName}`;
+                currentAudio = null;
+            };
+
+            currentAudio.onerror = (e) => {
+                btn.disabled = false;
+                btn.textContent = '试听';
+                status.textContent = `错误: 无法加载 ${voiceName}`;
+                console.error('Audio error:', e);
+                currentAudio = null;
+            };
+        }
+
+        function renderVoices() {
+            const container = document.getElementById('voices');
+
+            currentVoices.forEach(voice => {
+                const div = document.createElement('div');
+                div.className = 'voice-item';
+
+                const genderClass = voice.gender === 'male' ? 'gender-male' : 'gender-female';
+                const genderText = voice.gender === 'male' ? '男声' : '女声';
+
+                div.innerHTML = `
+                    <div class="voice-info">
+                        <span class="voice-id">ID ${voice.id}</span> -
+                        <strong>${voice.name}</strong> -
+                        <span class="${genderClass}">${genderText}</span> -
+                        ${voice.desc}
+                    </div>
+                    <button id="btn-${voice.id}" onclick="playVoice('${voice.id}', '${voice.name}')">
+                        试听
+                    </button>
+                `;
+
+                container.appendChild(div);
+            });
+        }
+
+        renderVoices();
+    </script>
+</body>
+</html>

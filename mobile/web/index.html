@@ -78,16 +78,49 @@
         // 如果TTS正在播放，不要重启识别
         if (_tts.speaking) {
           console.log('[STT] TTS播放中，暂不重启识别');
+          _stt.recognition = null;
           return;
         }
         if (_stt.userActive) {
-          try { rec.start(); console.log('[STT] 重启识别'); } catch(e) { _stt.userActive = false; _stt.ended = true; _sttClearSilenceWatch(); }
+          try {
+            _stt.recognition = null;
+            var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var newRec = new SR();
+            newRec.lang = 'zh-CN';
+            newRec.continuous = true;
+            newRec.interimResults = true;
+            newRec.maxAlternatives = 1;
+            _stt.recognition = newRec;
+            _sttBindEvents(newRec);
+            newRec.start();
+            console.log('[STT] 重启识别');
+          } catch(e) {
+            _stt.userActive = false;
+            _stt.ended = true;
+            _sttClearSilenceWatch();
+          }
         }
       };
       rec.onerror = function(ev) {
+        console.log('[STT] 错误事件:', ev.error);
         if (ev.error === 'aborted') return;
         if (ev.error === 'no-speech' && _stt.userActive) {
-          try { rec.start(); } catch(e) { _stt.userActive = false; _stt.ended = true; }
+          try {
+            _stt.recognition = null;
+            var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var newRec = new SR();
+            newRec.lang = 'zh-CN';
+            newRec.continuous = true;
+            newRec.interimResults = true;
+            newRec.maxAlternatives = 1;
+            _stt.recognition = newRec;
+            _sttBindEvents(newRec);
+            newRec.start();
+            console.log('[STT] no-speech后重启识别');
+          } catch(e) {
+            _stt.userActive = false;
+            _stt.ended = true;
+          }
           return;
         }
         console.error('[STT] 错误:', ev.error);
@@ -100,7 +133,13 @@
       _stt.silenceTimer = setInterval(function() {
         if (!_stt.userActive) { _sttClearSilenceWatch(); return; }
         var text = (_stt.finalText + _stt.interimText).trim();
-        if (text.length === 0 || _stt.lastResultMs === 0) return;
+        // 只有在有文本内容时才开始计时
+        if (text.length === 0) {
+          // 没有文本时，重置lastResultMs，避免初始倒计时
+          _stt.lastResultMs = 0;
+          return;
+        }
+        if (_stt.lastResultMs === 0) return;
 
         var elapsed = Date.now() - _stt.lastResultMs;
         // 只在达到阈值时触发一次
@@ -188,10 +227,12 @@
       _tts.speaking = true;
       u.onstart = function() {
         console.log('[TTS] 开始播放');
+        _tts.speaking = true;
         // 播放开始时停止语音识别，避免回声
         if (_stt.recognition && _stt.userActive) {
           try {
             _stt.recognition.stop();
+            _sttClearSilenceWatch();
             console.log('[TTS] 已停止语音识别以避免回声');
           } catch(e) {}
         }
@@ -204,7 +245,19 @@
           console.log('[TTS] 恢复语音识别');
           setTimeout(function() {
             if (_stt.userActive && !_stt.recognition) {
-              sttStart('zh-CN');
+              var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+              if (SR) {
+                var rec = new SR();
+                rec.lang = 'zh-CN';
+                rec.continuous = true;
+                rec.interimResults = true;
+                rec.maxAlternatives = 1;
+                _stt.recognition = rec;
+                _sttBindEvents(rec);
+                rec.start();
+                _sttStartSilenceWatch();
+                console.log('[TTS] 语音识别已恢复');
+              }
             }
           }, 300);
         }

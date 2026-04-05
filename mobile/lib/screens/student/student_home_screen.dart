@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'dart:html' as web;
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/permission_provider.dart';
@@ -20,6 +21,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   String _scene = 'chat'; // chat | camera
   String _sessionId = '';
   String _aiName = '小智';
+  String _aiVoice = '0'; // 用户选择的声音ID
   bool _hasProfile = false;
 
   @override
@@ -36,6 +38,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       if (profile != null && mounted) {
         setState(() {
           _aiName = profile['ai_name'] ?? '小智';
+          _aiVoice = profile['ai_voice'] ?? '0';
           _hasProfile = true;
         });
       } else if (mounted) {
@@ -86,6 +89,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           ? (_scene == 'chat' ? _ChatView(
               sessionId: _sessionId,
               aiName: _aiName,
+              aiVoice: _aiVoice,
               onSceneSwitch: _switchScene,
             ) : _CameraView(
               sessionId: _sessionId,
@@ -99,24 +103,27 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   void _showSettingsSheet(BuildContext context) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (_, controller) => Padding(
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('AI 设置', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('AI 设置', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
               const SizedBox(height: 20),
               ListTile(
                 leading: const Icon(Icons.badge_outlined),
@@ -176,22 +183,27 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   void _showProfileSheet(BuildContext context, AuthProvider auth) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.4,
-        minChildSize: 0.3,
-        maxChildSize: 0.7,
-        expand: false,
-        builder: (_, controller) => Padding(
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('个人信息', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
               CircleAvatar(
                 radius: 36,
                 backgroundColor: AppTheme.primaryColor,
@@ -250,10 +262,11 @@ class _InitSetupViewState extends State<_InitSetupView> {
   bool _loadingRegions = true;
 
   // 声音选择
-  String _selectedVoice = '101001';
+  String _selectedVoice = '0';
   final TtsService _tts = TtsService();
   List<Map<String, dynamic>> _voiceOptions = [];
   bool _loadingVoices = true;
+  web.AudioElement? _currentAudio; // 当前播放的音频元素
 
   @override
   void initState() {
@@ -271,6 +284,8 @@ class _InitSetupViewState extends State<_InitSetupView> {
           _loadingVoices = false;
           if (_voiceOptions.isNotEmpty) {
             _selectedVoice = _voiceOptions[0]['id'];
+            // 默认名字设置为第一个老师的名字
+            _nameCtrl.text = _voiceOptions[0]['name'];
           }
         });
       }
@@ -329,7 +344,7 @@ class _InitSetupViewState extends State<_InitSetupView> {
           const Icon(Icons.waving_hand, size: 64, color: AppTheme.primaryColor),
           const SizedBox(height: 16),
           const Text(
-            '欢迎使用学习指认AI！',
+            '欢迎使用学习助手！',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
@@ -399,7 +414,7 @@ class _InitSetupViewState extends State<_InitSetupView> {
             ),
           ],
           const SizedBox(height: 24),
-          const Text('给AI起个名字', style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text('给老师起个名字', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
@@ -409,7 +424,7 @@ class _InitSetupViewState extends State<_InitSetupView> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text('选择AI声音', style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text('选择老师声音', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           if (_loadingVoices)
             const Center(child: Padding(
@@ -426,8 +441,11 @@ class _InitSetupViewState extends State<_InitSetupView> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
                   onTap: () {
-                    setState(() => _selectedVoice = voiceId);
-                    _playVoiceSample(voiceName, voiceDesc);
+                    setState(() {
+                      _selectedVoice = voiceId;
+                      _nameCtrl.text = voiceName; // 自动填充老师名字
+                    });
+                    _playVoiceSample(voiceId, voiceDesc);
                   },
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
@@ -480,7 +498,7 @@ class _InitSetupViewState extends State<_InitSetupView> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.play_circle_outline),
-                          onPressed: () => _playVoiceSample(voiceName, voiceDesc),
+                          onPressed: () => _playVoiceSample(voiceId, voiceDesc),
                           tooltip: '试听',
                         ),
                       ],
@@ -502,9 +520,28 @@ class _InitSetupViewState extends State<_InitSetupView> {
     );
   }
 
-  void _playVoiceSample(String voiceName, String voiceDesc) {
-    final text = '你好，我是$voiceName，$voiceDesc';
-    _tts.speak(text, rate: 1.0, pitch: 1.0);
+  void _playVoiceSample(String voiceId, String voiceDesc) async {
+    try {
+      // 停止之前的播放
+      if (_currentAudio != null) {
+        _currentAudio!.pause();
+        _currentAudio = null;
+      }
+
+      // 调用后端TTS API试听
+      final url = 'https://45.78.5.184:8000/api/v1/tts/preview/$voiceId';
+
+      // 使用HTML audio元素播放
+      _currentAudio = web.AudioElement(url);
+      _currentAudio!.play();
+
+      // 播放结束后清空引用
+      _currentAudio!.onEnded.listen((_) {
+        _currentAudio = null;
+      });
+    } catch (e) {
+      print('试听失败: $e');
+    }
   }
 
   Future<void> _submit() async {
@@ -546,11 +583,13 @@ class _InitSetupViewState extends State<_InitSetupView> {
 class _ChatView extends StatefulWidget {
   final String sessionId;
   final String aiName;
+  final String aiVoice;
   final void Function(String) onSceneSwitch;
 
   const _ChatView({
     required this.sessionId,
     required this.aiName,
+    required this.aiVoice,
     required this.onSceneSwitch,
   });
 
@@ -569,6 +608,7 @@ class _ChatViewState extends State<_ChatView> {
   int _silenceMs = 0;
   late final SpeechService _speech;
   late final TtsService _tts;
+  web.AudioElement? _currentTTSAudio; // 当前播放的TTS音频
 
   @override
   void initState() {
@@ -589,16 +629,74 @@ class _ChatViewState extends State<_ChatView> {
     // 延迟自动开启语音模式并播放欢迎语音
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted && !_isListening) {
-        // 先开启语音识别
+        // 先开启语音识别（长连接模式）
         _autoStartListening();
         // 延迟后播放欢迎语音
         Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted && _tts.isSupported) {
-            _tts.speak('你好！我是${widget.aiName}，你的学习小助手。');
+          if (mounted) {
+            _playTTSResponse('你好！我是${widget.aiName}，你的学习小助手。');
           }
         });
       }
     });
+  }
+
+  void _playTTSResponse(String text) async {
+    try {
+      // 停止之前的播放
+      if (_currentTTSAudio != null) {
+        _currentTTSAudio!.pause();
+        _currentTTSAudio = null;
+      }
+
+      // 不停止语音识别，保持长连接模式
+      // 但需要标记TTS正在播放，避免回声被识别
+
+      // 调用后端TTS API，使用用户选择的声音
+      final url = 'https://45.78.5.184:8000/api/v1/tts/speak?voice_id=${widget.aiVoice}&text=${Uri.encodeComponent(text)}';
+
+      _currentTTSAudio = web.AudioElement(url);
+
+      // iPad兼容性：设置必要的属性
+      _currentTTSAudio!.setAttribute('playsinline', 'true');
+      _currentTTSAudio!.setAttribute('webkit-playsinline', 'true');
+      _currentTTSAudio!.setAttribute('preload', 'auto');
+
+      // 监听播放开始
+      _currentTTSAudio!.onPlay.listen((_) {
+        print('[TTS] 开始播放');
+      });
+
+      // 监听加载完成
+      _currentTTSAudio!.onCanPlay.listen((_) {
+        print('[TTS] 音频加载完成，开始播放');
+        _currentTTSAudio?.play()?.catchError((e) {
+          print('[TTS] 播放失败: $e');
+        });
+      });
+
+      // 监听播放错误
+      _currentTTSAudio!.onError.listen((e) {
+        print('[TTS] 音频错误: $e');
+        _currentTTSAudio = null;
+      });
+
+      // 播放结束后清理
+      _currentTTSAudio!.onEnded.listen((_) {
+        print('[TTS] 播放结束');
+        _currentTTSAudio = null;
+      });
+
+      // 预加载并播放音频
+      _currentTTSAudio!.load();
+
+      // 尝试立即播放（某些浏览器支持）
+      _currentTTSAudio!.play()?.catchError((e) {
+        print('[TTS] 立即播放失败，等待canplay: $e');
+      });
+    } catch (e) {
+      print('TTS播放失败: $e');
+    }
   }
 
   void _autoStartListening() {
@@ -716,7 +814,8 @@ class _ChatViewState extends State<_ChatView> {
 
         // 语音模式下自动播放AI回复，但不关闭语音识别
         if (wasVoice && reply.isNotEmpty && _tts.isSupported) {
-          _tts.speak(reply);
+          // 使用后端TTS API播放，使用用户选择的声音
+          _playTTSResponse(reply);
         }
 
         if (result['scene_changed'] == true && result['new_scene'] == 'camera') {

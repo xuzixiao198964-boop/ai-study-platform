@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from pydantic import BaseModel
+import httpx
+import os
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -19,148 +22,169 @@ class VoiceOption(BaseModel):
     description: str
 
 
-# 腾讯云TTS标准音色列表
-# 参考: https://cloud.tencent.com/document/product/1073/37995
+# 学习助手声音列表
 TENCENT_VOICES = [
-    # 中文女声
+    # 女老师
     VoiceOption(
-        id="101001",
-        name="智瑜",
+        id="0",
+        name="宁老师",
         gender="female",
         language="zh-CN",
-        description="温柔女声，音色柔和亲切"
+        description="温柔耐心，擅长鼓励引导"
     ),
     VoiceOption(
-        id="101002",
-        name="智聆",
+        id="5",
+        name="安老师",
         gender="female",
         language="zh-CN",
-        description="通用女声，清晰自然"
+        description="温和亲切，善于倾听"
     ),
     VoiceOption(
-        id="101003",
-        name="智美",
+        id="7",
+        name="欣老师",
         gender="female",
         language="zh-CN",
-        description="客服女声，专业亲和"
+        description="富有感染力，生动有趣"
     ),
     VoiceOption(
-        id="101004",
-        name="智云",
+        id="1001",
+        name="瑜老师",
         gender="female",
         language="zh-CN",
-        description="活力女声，年轻有活力"
+        description="声音柔和，讲解细致"
     ),
     VoiceOption(
-        id="101005",
-        name="智莉",
+        id="1002",
+        name="聆老师",
         gender="female",
         language="zh-CN",
-        description="温暖女声，温柔体贴"
+        description="吐字清晰，表达自然"
     ),
     VoiceOption(
-        id="101006",
-        name="智言",
+        id="1003",
+        name="美老师",
         gender="female",
         language="zh-CN",
-        description="情感女声，富有感染力"
+        description="专业标准，条理清楚"
     ),
+    # 男老师
     VoiceOption(
-        id="101007",
-        name="智娜",
-        gender="female",
-        language="zh-CN",
-        description="客服女声，专业标准"
-    ),
-    VoiceOption(
-        id="101008",
-        name="智琪",
-        gender="female",
-        language="zh-CN",
-        description="新闻女声，播音腔调"
-    ),
-    VoiceOption(
-        id="101009",
-        name="智芸",
-        gender="female",
-        language="zh-CN",
-        description="知性女声，成熟稳重"
-    ),
-    VoiceOption(
-        id="101010",
-        name="智华",
-        gender="female",
-        language="zh-CN",
-        description="通用女声，标准普通话"
-    ),
-    # 中文男声
-    VoiceOption(
-        id="101011",
-        name="智刚",
+        id="1",
+        name="希老师",
         gender="male",
         language="zh-CN",
-        description="沉稳男声，浑厚有力"
+        description="年轻有活力，富有激情"
     ),
     VoiceOption(
-        id="101012",
-        name="智瑞",
+        id="2",
+        name="晚老师",
         gender="male",
         language="zh-CN",
-        description="通用男声，清晰自然"
+        description="成熟稳重，知识渊博"
     ),
     VoiceOption(
-        id="101013",
-        name="智博",
+        id="3",
+        name="刚老师",
         gender="male",
         language="zh-CN",
-        description="客服男声，专业亲和"
+        description="清晰明亮，思路清晰"
     ),
     VoiceOption(
-        id="101014",
-        name="智向",
+        id="6",
+        name="叶老师",
         gender="male",
         language="zh-CN",
-        description="开朗男声，阳光活力"
-    ),
-    VoiceOption(
-        id="101015",
-        name="智安",
-        gender="male",
-        language="zh-CN",
-        description="温和男声，温暖亲切"
-    ),
-    VoiceOption(
-        id="101016",
-        name="智飞",
-        gender="male",
-        language="zh-CN",
-        description="情感男声，富有感染力"
-    ),
-    VoiceOption(
-        id="101017",
-        name="智彦",
-        gender="male",
-        language="zh-CN",
-        description="新闻男声，播音腔调"
-    ),
-    VoiceOption(
-        id="101018",
-        name="智宇",
-        gender="male",
-        language="zh-CN",
-        description="通用男声，标准普通话"
+        description="专业亲和，循循善诱"
     ),
 ]
 
 
 @router.get("/voices", response_model=List[VoiceOption])
-async def get_voices(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+async def get_voices():
     """
     获取可用的TTS声音列表
 
     返回腾讯云TTS支持的所有标准音色
     """
     return TENCENT_VOICES
+
+
+@router.get("/preview/{voice_id}")
+async def preview_voice(voice_id: str):
+    """
+    试听指定声音
+
+    调用腾讯云TTS API生成音频并返回
+    """
+    # 查找声音
+    voice = next((v for v in TENCENT_VOICES if v.id == voice_id), None)
+    if not voice:
+        raise HTTPException(status_code=404, detail="声音不存在")
+
+    # 试听文本
+    text = f"你好，我是{voice.name}，{voice.description}"
+
+    return _generate_tts_audio(voice_id, text)
+
+
+@router.get("/speak")
+async def speak_text(voice_id: str, text: str):
+    """
+    使用指定声音朗读文本
+
+    调用腾讯云TTS API生成音频并返回
+    """
+    # 查找声音
+    voice = next((v for v in TENCENT_VOICES if v.id == voice_id), None)
+    if not voice:
+        raise HTTPException(status_code=404, detail="声音不存在")
+
+    if not text or len(text.strip()) == 0:
+        raise HTTPException(status_code=400, detail="文本不能为空")
+
+    return _generate_tts_audio(voice_id, text)
+
+
+def _generate_tts_audio(voice_id: str, text: str):
+    """
+    生成TTS音频的通用方法
+    """
+    # 调用腾讯云TTS API
+    try:
+        secret_id = os.getenv("TENCENT_SECRET_ID")
+        secret_key = os.getenv("TENCENT_SECRET_KEY")
+
+        if not secret_id or not secret_key:
+            raise HTTPException(status_code=500, detail="TTS服务未配置")
+
+        # 使用腾讯云TTS SDK
+        from tencentcloud.common import credential
+        from tencentcloud.tts.v20190823 import tts_client, models
+
+        cred = credential.Credential(secret_id, secret_key)
+        client = tts_client.TtsClient(cred, "ap-guangzhou")
+
+        req = models.TextToVoiceRequest()
+        req.Text = text
+        req.SessionId = f"tts_{voice_id}_{hash(text)}"
+        req.VoiceType = int(voice_id)
+        req.Codec = "mp3"
+        req.SampleRate = 16000
+
+        resp = client.TextToVoice(req)
+
+        # 返回音频数据
+        import base64
+        audio_data = base64.b64decode(resp.Audio)
+
+        return Response(
+            content=audio_data,
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": f"inline; filename=tts_{voice_id}.mp3"
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TTS生成失败: {str(e)}")
+

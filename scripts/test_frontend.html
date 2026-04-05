@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>前端功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>AI学习平台 - 前端功能测试</h1>
+
+    <div class="test-section">
+        <h3>测试1: TTS声音列表API</h3>
+        <button onclick="testVoicesList()">测试声音列表</button>
+        <div id="voices-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试2: TTS声音试听</h3>
+        <button onclick="testVoicePreview('101001')">试听 智瑜(温柔女声)</button>
+        <button onclick="testVoicePreview('101004')">试听 智云(活力女声)</button>
+        <button onclick="testVoicePreview('101011')">试听 智刚(沉稳男声)</button>
+        <button onclick="testVoicePreview('101014')">试听 智向(开朗男声)</button>
+        <div id="preview-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试3: 前端应用加载</h3>
+        <button onclick="testFrontendLoad()">测试前端加载</button>
+        <div id="frontend-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://45.78.5.184:8000/api/v1';
+
+        async function testVoicesList() {
+            const result = document.getElementById('voices-result');
+            result.innerHTML = '测试中...';
+
+            try {
+                const resp = await fetch(`${API_BASE}/tts/voices`);
+                if (resp.ok) {
+                    const voices = await resp.json();
+                    result.innerHTML = `<span class="success">✓ 成功获取${voices.length}种声音</span>\n\n`;
+                    result.innerHTML += voices.slice(0, 5).map(v =>
+                        `${v.id}: ${v.name} - ${v.description}`
+                    ).join('\n');
+                } else {
+                    result.innerHTML = `<span class="error">✗ 错误: HTTP ${resp.status}</span>`;
+                }
+            } catch (e) {
+                result.innerHTML = `<span class="error">✗ 失败: ${e.message}</span>`;
+            }
+        }
+
+        async function testVoicePreview(voiceId) {
+            const result = document.getElementById('preview-result');
+            result.innerHTML = `测试声音 ${voiceId}...`;
+
+            try {
+                const resp = await fetch(`${API_BASE}/tts/preview/${voiceId}`);
+                if (resp.ok) {
+                    const blob = await resp.blob();
+                    const audio = new Audio(URL.createObjectURL(blob));
+
+                    result.innerHTML = `<span class="success">✓ 声音${voiceId}加载成功 (${blob.size} bytes)</span>`;
+
+                    audio.play();
+                    audio.onended = () => {
+                        result.innerHTML += '\n<span class="success">✓ 播放完成</span>';
+                    };
+                } else {
+                    result.innerHTML = `<span class="error">✗ 错误: HTTP ${resp.status}</span>`;
+                }
+            } catch (e) {
+                result.innerHTML = `<span class="error">✗ 失败: ${e.message}</span>`;
+            }
+        }
+
+        async function testFrontendLoad() {
+            const result = document.getElementById('frontend-result');
+            result.innerHTML = '测试中...';
+
+            try {
+                const resp = await fetch('https://45.78.5.184:8000/');
+                if (resp.ok) {
+                    const html = await resp.text();
+                    result.innerHTML = `<span class="success">✓ 前端加载成功 (${html.length} bytes)</span>\n`;
+                    result.innerHTML += `包含main.dart.js: ${html.includes('main.dart.js') ? '是' : '否'}\n`;
+                    result.innerHTML += `包含flutter.js: ${html.includes('flutter.js') ? '是' : '否'}`;
+                } else {
+                    result.innerHTML = `<span class="error">✗ 错误: HTTP ${resp.status}</span>`;
+                }
+            } catch (e) {
+                result.innerHTML = `<span class="error">✗ 失败: ${e.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
