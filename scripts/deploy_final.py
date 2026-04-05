@@ -1,64 +1,101 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""部署最终修复到服务器"""
+
 import paramiko
+import os
+import sys
 
-HOST = "45.78.5.184"
+# 服务器配置
+HOST = '45.78.5.184'
 PORT = 22
-USER = "root"
-PASSWORD = "FYCZWP2uPLjR"
+USER = 'root'
+PASSWORD = 'FYCZWP2uPLjR'
 
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+def filter_output(text):
+    """过滤特殊字符，避免编码错误"""
+    if not text:
+        return ''
+    return ''.join(c for c in text if ord(c) < 0x10000)
 
-try:
-    ssh.connect(HOST, PORT, USER, PASSWORD)
-    print("[OK] Connected")
+def upload_file(sftp, local_path, remote_path):
+    """上传单个文件"""
+    try:
+        remote_dir = os.path.dirname(remote_path)
+        try:
+            sftp.stat(remote_dir)
+        except IOError:
+            dirs = []
+            while remote_dir and remote_dir != '/':
+                dirs.append(remote_dir)
+                remote_dir = os.path.dirname(remote_dir)
+            dirs.reverse()
+            for d in dirs:
+                try:
+                    sftp.stat(d)
+                except IOError:
+                    sftp.mkdir(d)
 
-    # 修改flutter_bootstrap.js禁用Service Worker
-    cmd = """
-cd /opt/ai-study-mobile/build/web
-if [ -f flutter_bootstrap.js ]; then
-    cp flutter_bootstrap.js flutter_bootstrap.js.bak
-    sed -i 's/serviceWorkerSettings: {/\/\/ serviceWorkerSettings: {/' flutter_bootstrap.js
-    sed -i 's/serviceWorkerVersion:/\/\/ serviceWorkerVersion:/' flutter_bootstrap.js
-    echo "[OK] Modified flutter_bootstrap.js"
-    echo ""
-    echo "Checking modification:"
-    grep -A 3 "loader.load" flutter_bootstrap.js | tail -5
-else
-    echo "[ERROR] flutter_bootstrap.js not found"
-fi
-"""
+        sftp.put(local_path, remote_path)
+        print(f'[OK] {local_path} -> {remote_path}')
+        return True
+    except Exception as e:
+        print(f'[FAIL] {local_path}: {filter_output(str(e))}')
+        return False
 
-    stdin, stdout, stderr = ssh.exec_command(cmd)
-    output = stdout.read().decode('utf-8', errors='ignore')
-    error = stderr.read().decode('utf-8', errors='ignore')
+def main():
+    print('=== 部署最终修复到服务器 ===\n')
 
-    print(output)
-    if error:
-        print("Errors:", error)
+    print(f'连接到 {HOST}...')
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    # 重启nginx
-    print("\n" + "="*70)
-    print("Restarting nginx...")
-    stdin, stdout, stderr = ssh.exec_command("systemctl restart nginx")
-    stdout.read()
+    try:
+        ssh.connect(HOST, PORT, USER, PASSWORD)
+        sftp = ssh.open_sftp()
+        print('[OK] SSH连接成功\n')
 
-    print("\n" + "="*70)
-    print("Deployment completed!")
-    print("="*70)
-    print("\nFixed issues:")
-    print("1. Service Worker SSL error - Disabled in flutter_bootstrap.js")
-    print("2. Voice gender mapping - Updated in backend TTS API:")
-    print("   - ID 1 (yun xiao xi): female -> male")
-    print("   - ID 2 (yun xiao wan): female -> male")
-    print("   - ID 3 (yun xiao gang): Updated description")
-    print("   - ID 4 (yun xiao bin): male -> female")
-    print("   - ID 5 (yun xiao an): male -> female")
-    print("   - ID 6 (yun xiao ye): female -> male")
-    print("\nPlease test at: https://45.78.5.184:8000")
-    print("Clear browser cache (Ctrl+Shift+R) to see the changes")
+        print('1. 上传Flutter源文件...')
+        local_file = 'D:/work/ai-study-platform/mobile/lib/screens/student/student_home_screen.dart'
+        remote_file = '/opt/ai-study-platform/mobile/lib/screens/student/student_home_screen.dart'
+        upload_file(sftp, local_file, remote_file)
 
-except Exception as e:
-    print(f"[ERROR] {e}")
-finally:
-    ssh.close()
+        print('\n2. 构建Flutter Web应用...')
+        stdin, stdout, stderr = ssh.exec_command(
+            'cd /opt/ai-study-platform/mobile && /root/flutter/bin/flutter build web --release'
+        )
+
+        for line in stdout:
+            line = filter_output(line.strip())
+            if line:
+                print(f'  {line}')
+
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code == 0:
+            print('[OK] Flutter构建成功')
+        else:
+            print(f'[FAIL] Flutter构建失败')
+            return
+
+        print('\n3. 复制到Nginx目录...')
+        stdin, stdout, stderr = ssh.exec_command(
+            'cp -r /opt/ai-study-platform/mobile/build/web/* /opt/ai-study-mobile/build/web/'
+        )
+        stdout.channel.recv_exit_status()
+        print('[OK] 复制完成')
+
+        print('\n4. 重启Nginx...')
+        stdin, stdout, stderr = ssh.exec_command('systemctl restart nginx')
+        stdout.channel.recv_exit_status()
+        print('[OK] Nginx已重启')
+
+        print('\n=== 部署完成 ===')
+
+    except Exception as e:
+        print(f'\n[ERROR] {filter_output(str(e))}')
+        sys.exit(1)
+    finally:
+        ssh.close()
+
+if __name__ == '__main__':
+    main()

@@ -649,8 +649,11 @@ class _ChatViewState extends State<_ChatView> {
         _currentTTSAudio = null;
       }
 
-      // 长连接模式：语音识别保持运行，不停止
-      // 依靠浏览器内置的回声消除功能过滤系统播放的声音
+      // TTS播放时停止语音识别，避免回声
+      if (_isListening) {
+        _speech.stop();
+        setState(() => _isListening = false);
+      }
 
       // 调用后端TTS API，使用用户选择的声音
       final url = 'https://45.78.5.184:8000/api/v1/tts/speak?voice_id=${widget.aiVoice}&text=${Uri.encodeComponent(text)}';
@@ -662,35 +665,60 @@ class _ChatViewState extends State<_ChatView> {
       _currentTTSAudio!.setAttribute('webkit-playsinline', 'true');
       _currentTTSAudio!.setAttribute('preload', 'auto');
 
+      // iPad需要用户交互才能播放，添加autoplay
+      _currentTTSAudio!.autoplay = true;
+
       // 监听加载完成
       _currentTTSAudio!.onCanPlay.listen((_) {
         print('[TTS] 音频加载完成，开始播放');
-        _currentTTSAudio?.play()?.catchError((e) {
-          print('[TTS] 播放失败: $e');
-        });
+        try {
+          _currentTTSAudio?.play()?.then((_) {
+            print('[TTS] 播放成功');
+          }).catchError((e) {
+            print('[TTS] 播放失败: $e');
+          });
+        } catch (e) {
+          print('[TTS] play()异常: $e');
+        }
       });
 
       // 监听播放错误
       _currentTTSAudio!.onError.listen((e) {
         print('[TTS] 音频错误: $e');
         _currentTTSAudio = null;
+        // 恢复语音识别
+        if (_voiceMode && !_isListening) {
+          _autoStartListening();
+        }
       });
 
-      // 播放结束
+      // 播放结束后立即恢复语音识别
       _currentTTSAudio!.onEnded.listen((_) {
-        print('[TTS] 播放结束');
+        print('[TTS] 播放结束，立即恢复识别');
         _currentTTSAudio = null;
+        // 立即恢复识别，无延迟
+        if (_voiceMode && !_isListening) {
+          _autoStartListening();
+        }
       });
 
       // 预加载并播放音频
       _currentTTSAudio!.load();
 
       // 尝试立即播放（某些浏览器支持）
-      _currentTTSAudio!.play()?.catchError((e) {
-        print('[TTS] 立即播放失败，等待canplay: $e');
-      });
+      try {
+        _currentTTSAudio!.play()?.catchError((e) {
+          print('[TTS] 立即播放失败，等待canplay: $e');
+        });
+      } catch (e) {
+        print('[TTS] play()调用失败: $e');
+      }
     } catch (e) {
       print('TTS播放失败: $e');
+      // 出错时恢复语音识别
+      if (_voiceMode && !_isListening) {
+        _autoStartListening();
+      }
     }
   }
 

@@ -72,6 +72,12 @@
         _stt.lastResultMs = Date.now();
         _stt.silenceTriggered = false;  // 有新内容时重置触发标志
         console.log('[STT] 识别结果:', ft || it, '时间:', _stt.lastResultMs);
+
+        // 只在有文本时才启动静默检测
+        if ((ft + it).trim().length > 0 && !_stt.silenceTimer) {
+          console.log('[STT] 检测到文本，启动静默检测');
+          _sttStartSilenceWatch();
+        }
       };
       rec.onend = function() {
         console.log('[STT] onend, userActive:', _stt.userActive, 'ttsSpeaking:', _tts.speaking);
@@ -94,6 +100,10 @@
             _sttBindEvents(newRec);
             newRec.start();
             console.log('[STT] 重启识别');
+            // 重启后继续静默检测（如果之前有文本）
+            if ((_stt.finalText + _stt.interimText).trim().length > 0) {
+              _sttStartSilenceWatch();
+            }
           } catch(e) {
             _stt.userActive = false;
             _stt.ended = true;
@@ -162,8 +172,12 @@
       rec.lang = lang || 'zh-CN'; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
       _stt.finalText = ''; _stt.interimText = ''; _stt.error = null; _stt.ended = false;
       _stt.lastResultMs = 0; _stt.userActive = true; _stt.recognition = rec;
+      _stt.silenceTriggered = false;
       _vc.carryOver = ''; _vc.holdMode = false;
-      _sttBindEvents(rec); rec.start(); _sttStartSilenceWatch();
+      _sttBindEvents(rec);
+      rec.start();
+      // 不在启动时就开始静默检测，等有文本输入后再启动
+      console.log('[STT] 启动识别，等待用户输入');
     };
 
     window.sttStop = function() {
@@ -255,11 +269,11 @@
                 _stt.recognition = rec;
                 _sttBindEvents(rec);
                 rec.start();
-                _sttStartSilenceWatch();
+                // 不在这里启动静默检测，等用户说话后再启动
                 console.log('[TTS] 语音识别已恢复');
               }
             }
-          }, 300);
+          }, 100);  // 缩短延迟到100ms
         }
       };
       u.onerror = function(e) {
