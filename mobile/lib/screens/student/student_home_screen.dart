@@ -662,9 +662,13 @@ class _ChatViewState extends State<_ChatView> {
       _currentTTSAudio!.setAttribute('webkit-playsinline', 'true');
       _currentTTSAudio!.setAttribute('preload', 'auto');
 
-      // 监听播放开始
+      // 监听播放开始 - 停止语音识别避免回声
       _currentTTSAudio!.onPlay.listen((_) {
-        print('[TTS] 开始播放');
+        print('[TTS] 开始播放，暂停语音识别');
+        if (_isListening) {
+          _speech.stop();
+          setState(() => _isListening = false);
+        }
       });
 
       // 监听加载完成
@@ -679,12 +683,18 @@ class _ChatViewState extends State<_ChatView> {
       _currentTTSAudio!.onError.listen((e) {
         print('[TTS] 音频错误: $e');
         _currentTTSAudio = null;
+        // 恢复语音识别
+        _autoStartListening();
       });
 
-      // 播放结束后清理
+      // 播放结束后恢复语音识别
       _currentTTSAudio!.onEnded.listen((_) {
-        print('[TTS] 播放结束');
+        print('[TTS] 播放结束，恢复语音识别');
         _currentTTSAudio = null;
+        // 延迟300ms后恢复识别，避免尾音被捕获
+        Future.delayed(const Duration(milliseconds: 300), () {
+          _autoStartListening();
+        });
       });
 
       // 预加载并播放音频
