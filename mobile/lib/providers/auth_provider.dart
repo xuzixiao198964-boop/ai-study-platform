@@ -20,27 +20,43 @@ class AuthProvider extends ChangeNotifier {
   AuthToken? get authToken => _authToken;
   DeviceRole get deviceRole => _deviceRole;
   bool get isLoading => _isLoading;
-  bool get isAuthenticated => _authToken != null;
+  bool get isAuthenticated => _user != null;
   String? get error => _error;
   String get deviceType =>
       _deviceRole == DeviceRole.student ? 'student_ipad' : 'parent_android';
 
   Future<void> init() async {
+    print('[AuthProvider] init() 开始');
     await _api.loadToken();
+    print('[AuthProvider] loadToken完成, isAuthenticated=${_api.isAuthenticated}');
+
     if (_api.isAuthenticated) {
       try {
+        print('[AuthProvider] 调用getMe()...');
         final data = await _api.getMe();
         _user = User.fromJson(data);
+        print('[AuthProvider] getMe()成功, user=${_user?.username}');
 
         final prefs = await SharedPreferences.getInstance();
         final role = prefs.getString('device_role');
         _deviceRole = role == 'parent' ? DeviceRole.parent : DeviceRole.student;
+        print('[AuthProvider] deviceRole=$_deviceRole');
 
-        await _ws.connect(deviceType);
-      } catch (_) {
+        // WebSocket连接失败不应该影响登录状态
+        try {
+          await _ws.connect(deviceType);
+          print('[AuthProvider] WebSocket连接成功');
+        } catch (e) {
+          print('[AuthProvider] WebSocket连接失败: $e');
+        }
+      } catch (e) {
+        print('[AuthProvider] getMe()失败: $e');
+        // getMe()失败，清除token
         await _api.clearToken();
       }
     }
+
+    print('[AuthProvider] init()完成, isAuthenticated=$isAuthenticated');
     notifyListeners();
   }
 
@@ -57,7 +73,12 @@ class AuthProvider extends ChangeNotifier {
       final userData = await _api.getMe();
       _user = User.fromJson(userData);
 
-      await _ws.connect(deviceType);
+      // WebSocket连接失败不应该影响登录
+      try {
+        await _ws.connect(deviceType);
+      } catch (_) {
+        // WebSocket连接失败，但登录仍然成功
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -82,6 +103,13 @@ class AuthProvider extends ChangeNotifier {
 
       final userData = await _api.getMe();
       _user = User.fromJson(userData);
+
+      // WebSocket连接失败不应该影响注册
+      try {
+        await _ws.connect(deviceType);
+      } catch (_) {
+        // WebSocket连接失败，但注册仍然成功
+      }
 
       _isLoading = false;
       notifyListeners();

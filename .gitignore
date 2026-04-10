@@ -46,6 +46,15 @@ node_modules/
 .mypy_cache/
 .pytest_cache/
 
+# Local automation / scratch (avoid committing temp artifacts)
+chrome_test_profile/
+temp_*.js
+/temp_index*.html
+/*.log
+/test_*.py
+/test_automation*.py
+scripts/screenshots/
+
 # Deploy scripts with credentials
 scripts/ssh_cmd.py
 scripts/setup_db.py

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
+import 'dart:developer' as developer;
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -34,8 +35,13 @@ class ApiService {
   }
 
   Future<void> loadToken() async {
+    developer.log('loadToken() 开始', name: 'ApiService');
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('access_token');
+    developer.log(
+      'loadToken() 完成, isAuthenticated=$isAuthenticated, hasToken=${_token != null}',
+      name: 'ApiService',
+    );
   }
 
   Future<void> setToken(String token) async {
